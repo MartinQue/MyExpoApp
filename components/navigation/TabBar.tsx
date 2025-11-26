@@ -1,14 +1,15 @@
 import React from 'react';
-import { View, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, Platform, Text } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/Theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
 
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const { colors, isDark } = useTheme();
   const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
     profile: 'home-outline',
     chat: 'chatbubble-outline',
@@ -27,9 +28,17 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
   return (
     <View style={styles.wrapper}>
-      <BlurView intensity={80} tint="dark" style={styles.container}>
+      <BlurView
+        intensity={80}
+        tint={isDark ? 'dark' : 'light'}
+        style={[styles.container, { borderTopColor: colors.border }]}
+      >
         <LinearGradient
-          colors={['rgba(20, 18, 24, 0.85)', 'rgba(30, 26, 35, 0.9)']}
+          colors={
+            isDark
+              ? ['rgba(20, 18, 24, 0.85)', 'rgba(30, 26, 35, 0.9)']
+              : ['rgba(255, 255, 255, 0.95)', 'rgba(245, 245, 250, 0.98)']
+          }
           style={StyleSheet.absoluteFill}
         />
         {state.routes.map((route, index) => {
@@ -68,7 +77,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               accessibilityRole="button"
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={options.tabBarAccessibilityLabel}
-              testID={options.tabBarTestID}
+              testID={(options as any).tabBarTestID}
               onPress={onPress}
               onLongPress={onLongPress}
               style={styles.tab}
@@ -80,12 +89,28 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                     : (iconName as any)
                 }
                 size={24}
-                color={isFocused ? Colors.white : Colors.gray[500]}
+                color={
+                  isFocused
+                    ? isDark
+                      ? Colors.white
+                      : colors.primary
+                    : isDark
+                    ? Colors.gray[500]
+                    : Colors.gray[400]
+                }
               />
               <Text
                 style={[
                   styles.label,
-                  { color: isFocused ? Colors.white : Colors.gray[500] },
+                  {
+                    color: isFocused
+                      ? isDark
+                        ? Colors.white
+                        : colors.primary
+                      : isDark
+                      ? Colors.gray[500]
+                      : Colors.gray[500],
+                  },
                 ]}
               >
                 {label}

@@ -3,327 +3,544 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
   Dimensions,
   Pressable,
   RefreshControl,
-  LayoutChangeEvent,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { MotiView, AnimatePresence } from 'moti';
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   interpolate,
   Extrapolation,
-  withSpring,
-  FadeInDown,
+  FadeIn,
+  FadeInUp,
+  SlideInRight,
 } from 'react-native-reanimated';
-import { Colors } from '@/constants/Theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useUserStore } from '@/stores/userStore';
 import { usePlannerStore } from '@/stores/plannerStore';
-import * as Haptics from 'expo-haptics';
+import * as haptics from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { NextTaskCard } from '@/components/home/NextTaskCard';
 import { FeedCard } from '@/components/home/FeedCard';
-import { mockFeedCards } from '@/constants/MockData';
+import {
+  buildHomeFeed,
+  getTimeContext,
+  getDailyStats,
+  FeedCard as FeedCardType,
+  DailyStats,
+} from '@/lib/homeFeed';
 
-const { width, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+const HEADER_HEIGHT = 140;
+const HEADER_COLLAPSED_HEIGHT = 60;
 
-// Wrapper component for scroll effects
-const ParallaxItem = ({
-  children,
-  index,
-  scrollY,
-}: {
-  children: React.ReactNode;
-  index: number;
-  scrollY: Animated.SharedValue<number>;
-}) => {
-  const [itemY, setItemY] = useState(0);
+// Quick action items
+const QUICK_ACTIONS = [
+  { id: 'chat', icon: 'chatbubble', label: 'Chat', route: '/(tabs)/chat' },
+  {
+    id: 'imagine',
+    icon: 'sparkles',
+    label: 'Create',
+    route: '/(tabs)/imagine',
+  },
+  { id: 'planner', icon: 'calendar', label: 'Plan', route: '/(tabs)/planner' },
+  { id: 'library', icon: 'book', label: 'Library', route: '/(tabs)/library' },
+];
 
-  const onLayout = (event: LayoutChangeEvent) => {
-    setItemY(event.nativeEvent.layout.y);
+// Weather icons based on time and conditions
+const getWeatherIcon = (timeOfDay: string): string => {
+  switch (timeOfDay) {
+    case 'morning':
+      return 'sunny';
+    case 'afternoon':
+      return 'partly-sunny';
+    case 'evening':
+      return 'cloudy-night';
+    case 'night':
+      return 'moon';
+    default:
+      return 'sunny';
+  }
+};
+
+// Get contextual message based on time, day, and conditions
+const getContextualMessage = (timeOfDay: string): string => {
+  const day = new Date().getDay();
+  const hour = new Date().getHours();
+
+  // Weekend morning
+  if ((day === 0 || day === 6) && timeOfDay === 'morning') {
+    return 'Weekend vibes ☀️ Take it slow';
+  }
+
+  // Friday evening
+  if (day === 5 && timeOfDay === 'evening') {
+    return "It's Friday! 🎉 Time to unwind";
+  }
+
+  // Monday morning
+  if (day === 1 && timeOfDay === 'morning') {
+    return 'New week, new wins 💪';
+  }
+
+  // Late night work
+  if (hour >= 23 || hour < 5) {
+    return 'Burning the midnight oil? 🌙';
+  }
+
+  // Default messages by time
+  const messages: Record<string, string[]> = {
+    morning: ['Rise and conquer', 'Fresh start today', 'Make it count'],
+    afternoon: ['Keep the momentum', 'Stay focused', 'Halfway there'],
+    evening: ['Wind down gracefully', 'Reflect & recharge', 'Almost there'],
+    night: ['Rest well tonight', 'Tomorrow awaits', 'Sweet dreams'],
   };
 
-  const animatedStyle = useAnimatedStyle(() => {
-    // Only animate if we have a valid Y position
-    if (itemY === 0) return {};
-
-    const inputRange = [
-      itemY - SCREEN_HEIGHT + 50, // Enters from bottom
-      itemY - SCREEN_HEIGHT * 0.2, // Near center
-      itemY, // At top
-    ];
-
-    const opacity = interpolate(
-      scrollY.value,
-      inputRange,
-      [0.6, 1, 1],
-      Extrapolation.CLAMP
-    );
-
-    const scale = interpolate(
-      scrollY.value,
-      inputRange,
-      [0.96, 1, 1],
-      Extrapolation.CLAMP
-    );
-
-    const translateY = interpolate(
-      scrollY.value,
-      inputRange,
-      [20, 0, 0],
-      Extrapolation.CLAMP
-    );
-
-    return {
-      opacity,
-      transform: [{ translateY }, { scale }],
-    };
-  });
-
-  return (
-    <Animated.View
-      onLayout={onLayout}
-      style={[styles.feedItemWrapper, animatedStyle]}
-    >
-      {children}
-    </Animated.View>
-  );
+  const options = messages[timeOfDay] || messages.morning;
+  return options[Math.floor(Math.random() * options.length)];
 };
 
 export default function ProfileTab() {
+  const { colors, isDark, getGradientArray } = useTheme();
   const { user } = useUserStore();
   const { plans } = usePlannerStore();
-  const [greeting, setGreeting] = useState('Good Morning');
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [feed, setFeed] = useState<FeedCardType[]>([]);
+  const [stats, setStats] = useState<DailyStats | null>(null);
+  const [contextMessage, setContextMessage] = useState('');
   const router = useRouter();
   const scrollY = useSharedValue(0);
 
-  // Automated Context State
-  const [timeOfDay, setTimeOfDay] = useState<
-    'Morning' | 'Afternoon' | 'Evening'
-  >('Morning');
-  const [simulatedLocation, setSimulatedLocation] = useState<
-    'Home' | 'Work' | 'Gym'
-  >('Home');
-  const [isPrivacyMode, setIsPrivacyMode] = useState(false);
+  // Time context
+  const timeContext = getTimeContext();
+  const { greeting, timeOfDay, suggestedContext } = timeContext;
+
+  // Set contextual message on mount
+  useEffect(() => {
+    setContextMessage(getContextualMessage(timeOfDay));
+  }, [timeOfDay]);
 
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y;
   });
 
-  useEffect(() => {
-    const updateContext = () => {
-      const hour = new Date().getHours();
-      let currentGreeting = 'Good Morning';
-      let time: 'Morning' | 'Afternoon' | 'Evening' = 'Morning';
-
-      if (hour >= 12 && hour < 17) {
-        currentGreeting = 'Good Afternoon';
-        time = 'Afternoon';
-      } else if (hour >= 17) {
-        currentGreeting = 'Good Evening';
-        time = 'Evening';
-      }
-      setGreeting(currentGreeting);
-      setTimeOfDay(time);
-
-      // Simulated Location Logic
-      if (hour >= 9 && hour < 17) {
-        setSimulatedLocation('Work');
-        setIsPrivacyMode(true);
-      } else if (hour >= 18 && hour < 20) {
-        setSimulatedLocation('Gym');
-        setIsPrivacyMode(false);
-      } else {
-        setSimulatedLocation('Home');
-        setIsPrivacyMode(false);
-      }
+  // Animated header opacity that fades as you scroll
+  const headerAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollY.value,
+      [0, HEADER_HEIGHT],
+      [1, 0],
+      Extrapolation.CLAMP
+    );
+    const translateY = interpolate(
+      scrollY.value,
+      [0, HEADER_HEIGHT],
+      [0, -20],
+      Extrapolation.CLAMP
+    );
+    return {
+      opacity,
+      transform: [{ translateY }],
     };
-
-    updateContext();
-    const interval = setInterval(updateContext, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }, 2000);
-  }, []);
-
-  // Context-Aware Feed Logic
-  const processedFeed = [...mockFeedCards].sort((a, b) => {
-    const aScore =
-      a.context?.toLowerCase() === simulatedLocation.toLowerCase() ? 2 : 0;
-    const bScore =
-      b.context?.toLowerCase() === simulatedLocation.toLowerCase() ? 2 : 0;
-    return bScore - aScore;
   });
 
+  // Animated scale for the greeting
+  const greetingAnimatedStyle = useAnimatedStyle(() => {
+    const scale = interpolate(
+      scrollY.value,
+      [0, HEADER_HEIGHT / 2],
+      [1, 0.9],
+      Extrapolation.CLAMP
+    );
+    return {
+      transform: [{ scale }],
+    };
+  });
+
+  // Parallax effect for quick actions
+  const quickActionsAnimatedStyle = useAnimatedStyle(() => {
+    const translateY = interpolate(
+      scrollY.value,
+      [0, HEADER_HEIGHT],
+      [0, -30],
+      Extrapolation.CLAMP
+    );
+    const opacity = interpolate(
+      scrollY.value,
+      [0, HEADER_HEIGHT / 2],
+      [1, 0.5],
+      Extrapolation.CLAMP
+    );
+    return {
+      transform: [{ translateY }],
+      opacity,
+    };
+  });
+
+  // Load AI-powered feed
+  const loadFeed = useCallback(async () => {
+    try {
+      console.log('📱 Loading personalized home feed...');
+      const [feedData, statsData] = await Promise.all([
+        buildHomeFeed({
+          userName: user?.name || 'Friend',
+          plans: plans,
+        }),
+        getDailyStats(),
+      ]);
+
+      setFeed(feedData);
+      setStats(statsData);
+      console.log(`✅ Loaded ${feedData.length} feed items`);
+    } catch (error) {
+      console.error('Failed to load feed:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.name, plans]);
+
+  useEffect(() => {
+    loadFeed();
+  }, [loadFeed]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    haptics.light();
+
+    // Refresh contextual message too
+    setContextMessage(getContextualMessage(timeOfDay));
+
+    await loadFeed();
+
+    setRefreshing(false);
+    haptics.success();
+  }, [loadFeed, timeOfDay]);
+
+  // Navigate to a quick action
+  const handleQuickAction = (route: string) => {
+    haptics.button();
+    router.push(route as any);
+  };
+
   const getNextTaskCard = () => {
-    const nextTask = plans[0];
-    if (!nextTask)
+    const nextTask =
+      plans.find(
+        (p) =>
+          p.dueDate?.toLowerCase().includes('today') ||
+          p.dueDate?.toLowerCase().includes('now')
+      ) || plans[0];
+
+    if (!nextTask) {
       return {
-        title: 'Relax and recharge',
-        time: 'No immediate plans',
-        type: 'free',
-      };
-    const isToday =
-      nextTask.dueDate?.toLowerCase().includes('today') ||
-      nextTask.dueDate?.toLowerCase().includes('now');
-    if (isToday) {
-      return nextTask;
-    } else {
-      return {
-        title: 'Relax and recharge',
-        time: 'No immediate plans',
+        title: suggestedContext,
+        time: 'No scheduled tasks',
         type: 'free',
       };
     }
+
+    return {
+      title: nextTask.nextTask || nextTask.title,
+      time: nextTask.dueDate,
+      type: 'task',
+    };
   };
 
   const nextTask = getNextTaskCard();
 
   const renderHeader = () => (
     <>
-      {/* Header */}
-      <View style={styles.header}>
+      {/* Animated Header */}
+      <Animated.View style={[styles.header, headerAnimatedStyle]}>
         <View style={styles.headerTop}>
-          <View>
-            <MotiView
-              from={{ opacity: 0, translateY: -10 }}
-              animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 500 }}
-            >
-              <Text style={styles.greeting}>
+          <Animated.View style={greetingAnimatedStyle}>
+            <View style={styles.greetingRow}>
+              <Text style={[styles.greeting, { color: colors.text }]}>
                 {greeting}, {user?.name || 'Traveler'}
               </Text>
-              <Text style={styles.subGreeting}>
-                {isPrivacyMode ? 'Privacy Mode Active • ' : ''}
-                {simulatedLocation} • {timeOfDay}
-              </Text>
-            </MotiView>
-          </View>
+              <View
+                style={[
+                  styles.weatherBadge,
+                  { backgroundColor: colors.glassBackground },
+                ]}
+              >
+                <Ionicons
+                  name={getWeatherIcon(timeOfDay) as any}
+                  size={16}
+                  color={colors.primary}
+                />
+              </View>
+            </View>
+            <Text style={[styles.subGreeting, { color: colors.primary }]}>
+              {contextMessage}
+            </Text>
+          </Animated.View>
 
           <Pressable
-            style={styles.iconButton}
-            onPress={() => router.push('/settings')}
+            style={[
+              styles.iconButton,
+              {
+                backgroundColor: colors.glassBackground,
+                borderColor: colors.glassBorder,
+              },
+            ]}
+            onPress={() => {
+              haptics.button();
+              router.push('/settings');
+            }}
           >
-            <Ionicons name="settings-outline" size={20} color="white" />
+            <Ionicons name="settings-outline" size={20} color={colors.text} />
           </Pressable>
         </View>
-      </View>
+      </Animated.View>
+
+      {/* Quick Actions */}
+      <Animated.View
+        style={[styles.quickActionsContainer, quickActionsAnimatedStyle]}
+      >
+        <Animated.ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.quickActionsScroll}
+        >
+          {QUICK_ACTIONS.map((action, index) => (
+            <Animated.View
+              key={action.id}
+              entering={SlideInRight.delay(index * 50).duration(300)}
+            >
+              <Pressable
+                style={[
+                  styles.quickActionPill,
+                  {
+                    backgroundColor: colors.glassBackground,
+                    borderColor: colors.glassBorder,
+                  },
+                ]}
+                onPress={() => handleQuickAction(action.route)}
+              >
+                <Ionicons
+                  name={action.icon as any}
+                  size={18}
+                  color={colors.primary}
+                />
+                <Text style={[styles.quickActionLabel, { color: colors.text }]}>
+                  {action.label}
+                </Text>
+              </Pressable>
+            </Animated.View>
+          ))}
+        </Animated.ScrollView>
+      </Animated.View>
 
       {/* What's up next */}
-      <MotiView
-        from={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ type: 'spring', delay: 200 }}
-      >
+      <Animated.View entering={FadeInUp.delay(200).duration(400)}>
         <NextTaskCard
           task={nextTask}
           onPress={() => router.push('/(tabs)/planner' as any)}
         />
-      </MotiView>
+      </Animated.View>
 
       {/* Your Story Today */}
-      <Text style={styles.sectionTitle}>Your Story Today</Text>
+      <Animated.Text
+        entering={FadeIn.delay(300)}
+        style={[styles.sectionTitle, { color: colors.text }]}
+      >
+        Your Story Today
+      </Animated.Text>
     </>
   );
 
-  const renderFooter = () => (
-    <MotiView
-      from={{ opacity: 0, translateY: 20 }}
-      animate={{ opacity: 1, translateY: 0 }}
-      transition={{ delay: 600 }}
-      style={styles.progressCardWrapper}
-    >
-      <Pressable
-        style={styles.progressCard}
-        onPress={() => {
-          Haptics.selectionAsync();
-          // Navigate to detailed analysis
-        }}
-      >
-        <View style={styles.progressHeader}>
-          <Text style={styles.progressTitle}>Daily Review</Text>
-          <Ionicons name="chevron-forward" size={20} color={Colors.gray[400]} />
-        </View>
-        <View style={styles.progressStats}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>4/6</Text>
-            <Text style={styles.statLabel}>Tasks Done</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>85%</Text>
-            <Text style={styles.statLabel}>Energy</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>2h</Text>
-            <Text style={styles.statLabel}>Focus Time</Text>
-          </View>
-        </View>
-        <View style={styles.progressBarContainer}>
-          <View style={[styles.progressBar, { width: '66%' }]} />
-        </View>
-        <Text style={styles.progressFooter}>Tap to view full analysis</Text>
-      </Pressable>
-    </MotiView>
-  );
+  const renderFooter = () => {
+    if (!stats) return null;
 
-  const renderItem = useCallback(
-    ({ item, index }: { item: any; index: number }) => {
-      const isContextRelevant =
-        item.context?.toLowerCase() === simulatedLocation.toLowerCase();
-      return (
-        <ParallaxItem key={item.id} index={index} scrollY={scrollY}>
-          <FeedCard
-            card={item}
-            isContextRelevant={isContextRelevant}
-            index={index}
-          />
-        </ParallaxItem>
-      );
-    },
-    [simulatedLocation]
-  );
+    const completionPercent =
+      Math.round((stats.tasksCompleted / stats.totalTasks) * 100) || 0;
+
+    return (
+      <Animated.View
+        entering={FadeIn.delay(300)}
+        style={styles.progressCardWrapper}
+      >
+        <BlurView
+          intensity={isDark ? 60 : 30}
+          tint={isDark ? 'dark' : 'light'}
+          style={styles.progressCardBlur}
+        >
+          <Pressable
+            style={[
+              styles.progressCard,
+              {
+                backgroundColor: colors.glassBackground,
+                borderColor: colors.glassBorder,
+              },
+            ]}
+            onPress={() => {
+              haptics.button();
+              router.push('/(tabs)/planner' as any);
+            }}
+          >
+            <View style={styles.progressHeader}>
+              <Text style={[styles.progressTitle, { color: colors.text }]}>
+                Daily Review
+              </Text>
+              <View
+                style={[
+                  styles.streakBadge,
+                  { backgroundColor: 'rgba(255, 107, 0, 0.15)' },
+                ]}
+              >
+                <Ionicons name="flame" size={14} color="#FF6B00" />
+                <Text style={styles.streakText}>{stats.streak} day streak</Text>
+              </View>
+            </View>
+            <View style={styles.progressStats}>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: colors.text }]}>
+                  {stats.tasksCompleted}/{stats.totalTasks}
+                </Text>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                  Tasks Done
+                </Text>
+              </View>
+              <View
+                style={[styles.statDivider, { backgroundColor: colors.border }]}
+              />
+              <View style={styles.statItem}>
+                <View style={styles.statValueRow}>
+                  <Text style={[styles.statValue, { color: colors.text }]}>
+                    {stats.energyLevel}%
+                  </Text>
+                  <Ionicons
+                    name={
+                      stats.moodTrend === 'up'
+                        ? 'arrow-up'
+                        : stats.moodTrend === 'down'
+                        ? 'arrow-down'
+                        : 'remove'
+                    }
+                    size={12}
+                    color={
+                      stats.moodTrend === 'up'
+                        ? colors.success
+                        : stats.moodTrend === 'down'
+                        ? colors.error
+                        : colors.textMuted
+                    }
+                  />
+                </View>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                  Energy
+                </Text>
+              </View>
+              <View
+                style={[styles.statDivider, { backgroundColor: colors.border }]}
+              />
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: colors.text }]}>
+                  {Math.round(stats.focusMinutes / 60)}h{' '}
+                  {stats.focusMinutes % 60}m
+                </Text>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>
+                  Focus Time
+                </Text>
+              </View>
+            </View>
+            <View
+              style={[
+                styles.progressBarContainer,
+                { backgroundColor: colors.border },
+              ]}
+            >
+              <Animated.View
+                style={[
+                  styles.progressBar,
+                  {
+                    width: `${completionPercent}%`,
+                    backgroundColor: colors.primary,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={[styles.progressFooter, { color: colors.primary }]}>
+              {completionPercent >= 80
+                ? '🎉 Great progress today!'
+                : 'Tap to view tasks'}
+            </Text>
+          </Pressable>
+        </BlurView>
+      </Animated.View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <LinearGradient
+          colors={getGradientArray('profile')}
+          style={StyleSheet.absoluteFill}
+        />
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.textMuted }]}>
+              Preparing your personalized feed...
+            </Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <Animated.ScrollView
-        onScroll={scrollHandler}
-        scrollEventThrottle={16}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={Colors.primary[400]}
-          />
-        }
-      >
-        {renderHeader()}
-        <View style={styles.feedContainer}>
-          {processedFeed.map((item, index) => renderItem({ item, index }))}
-          {renderFooter()}
-        </View>
-      </Animated.ScrollView>
-    </SafeAreaView>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <LinearGradient
+        colors={getGradientArray('profile')}
+        style={StyleSheet.absoluteFill}
+      />
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <Animated.ScrollView
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+            />
+          }
+        >
+          {renderHeader()}
+          <View style={styles.feedContainer}>
+            {feed.map((item, index) => (
+              <FeedCard
+                key={item.id}
+                card={item}
+                isContextRelevant={item.priority === 3}
+                index={index}
+              />
+            ))}
+            {renderFooter()}
+          </View>
+        </Animated.ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   safeArea: {
     flex: 1,
   },
@@ -340,97 +557,80 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
+  greetingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   greeting: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: Colors.white,
-    fontFamily: 'System',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+  },
+  weatherBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   subGreeting: {
-    fontSize: 12,
-    color: Colors.primary[400],
-    marginTop: 4,
+    fontSize: 13,
+    marginTop: 6,
     fontWeight: '600',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   iconButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: Colors.gray[700],
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  quickActionsContainer: {
+    marginBottom: 20,
+    marginTop: 8,
+  },
+  quickActionsScroll: {
+    paddingVertical: 4,
+    gap: 10,
+  },
+  quickActionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  quickActionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: Colors.white,
     marginBottom: 16,
-    marginTop: 24,
+    marginTop: 16,
     letterSpacing: 0.5,
   },
   feedContainer: {
-    gap: 12,
-  },
-  feedItemWrapper: {
-    color: Colors.white,
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    lineHeight: 28,
-  },
-  cardBody: {
-    color: Colors.gray[300],
-    fontSize: 15,
-    lineHeight: 24,
-  },
-  quoteText: {
-    fontSize: 20,
-    fontStyle: 'italic',
-    color: Colors.white,
-    textAlign: 'center',
-    paddingVertical: 10,
-    fontFamily: 'System', // Use a nice serif if available, or default
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: 16,
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
-  },
-  actionButton: {
-    padding: 4,
-  },
-  priorityBadge: {
-    marginLeft: 'auto',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  priorityText: {
-    color: Colors.white,
-    fontSize: 10,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
+    gap: 0,
   },
   progressCardWrapper: {
     marginTop: 10,
     marginBottom: 20,
   },
+  progressCardBlur: {
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
   progressCard: {
-    backgroundColor: 'rgba(20, 20, 25, 0.9)',
     borderRadius: 24,
     padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
   progressHeader: {
     flexDirection: 'row',
@@ -439,7 +639,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   progressTitle: {
-    color: Colors.white,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -450,37 +649,60 @@ const styles = StyleSheet.create({
   },
   statItem: {
     alignItems: 'center',
+    flex: 1,
   },
   statValue: {
-    color: Colors.white,
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   statLabel: {
-    color: Colors.gray[400],
     fontSize: 12,
   },
   statDivider: {
     width: 1,
     height: '100%',
-    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   progressBarContainer: {
     height: 6,
-    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 3,
     marginBottom: 12,
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: Colors.primary[500],
     borderRadius: 3,
   },
   progressFooter: {
-    color: Colors.primary[300],
     fontSize: 12,
     textAlign: 'center',
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  streakText: {
+    color: '#FF6B00',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 14,
   },
 });

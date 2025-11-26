@@ -6,24 +6,53 @@ import {
   Switch,
   Pressable,
   Platform,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { Colors, BorderRadius } from '@/constants/Theme';
+import { BorderRadius } from '@/constants/Theme';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { GlassView } from '@/components/Glass/GlassView';
 import { useUserStore } from '@/stores/userStore';
-import * as Haptics from 'expo-haptics';
+import { useTheme } from '@/contexts/ThemeContext';
+import haptics from '@/lib/haptics';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { theme, toggleTheme } = useUserStore();
+  const { colors, isDark, getGradientArray, toggleTheme } = useTheme();
+  const {
+    user,
+    theme,
+    notificationsEnabled,
+    hapticEnabled,
+    voiceEnabled,
+    setNotificationsEnabled,
+    setHapticEnabled,
+    setVoiceEnabled,
+    logout,
+    isAuthenticated,
+  } = useUserStore();
 
   const handleBack = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.button();
     router.back();
+  };
+
+  const handleLogout = async () => {
+    haptics.warning();
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          await logout();
+          router.replace('/');
+        },
+      },
+    ]);
   };
 
   const SettingItem = ({
@@ -32,43 +61,66 @@ export default function SettingsScreen() {
     type = 'arrow',
     value = false,
     onToggle,
+    onPress,
+    destructive = false,
   }: {
     icon: keyof typeof Ionicons.glyphMap;
     label: string;
     type?: 'arrow' | 'toggle' | 'none';
     value?: boolean;
     onToggle?: (val: boolean) => void;
+    onPress?: () => void;
+    destructive?: boolean;
   }) => (
     <Pressable
       style={({ pressed }) => [
         styles.settingItem,
-        pressed && styles.settingItemPressed,
+        { borderBottomColor: colors.border },
+        pressed && [
+          styles.settingItemPressed,
+          { backgroundColor: colors.glassBackground },
+        ],
       ]}
       onPress={() => {
         if (type !== 'toggle') {
-          Haptics.selectionAsync();
+          haptics.selection();
+          onPress?.();
         }
       }}
     >
       <View style={styles.settingLeft}>
-        <View style={styles.iconContainer}>
-          <Ionicons name={icon} size={20} color="white" />
+        <View
+          style={[
+            styles.iconContainer,
+            { backgroundColor: colors.glassBackground },
+          ]}
+        >
+          <Ionicons
+            name={icon}
+            size={20}
+            color={destructive ? colors.error : colors.text}
+          />
         </View>
-        <ThemedText style={styles.settingLabel}>{label}</ThemedText>
+        <ThemedText
+          style={[styles.settingLabel, destructive && { color: colors.error }]}
+        >
+          {label}
+        </ThemedText>
       </View>
 
       {type === 'toggle' ? (
         <Switch
           value={value}
           onValueChange={(val) => {
-            Haptics.selectionAsync();
+            haptics.toggle();
             onToggle?.(val);
           }}
-          trackColor={{ false: '#3e3e3e', true: Colors.primary }}
-          thumbColor={'white'}
+          trackColor={{ false: colors.surface, true: colors.primary }}
+          thumbColor={colors.text}
+          ios_backgroundColor={colors.surface}
         />
       ) : type === 'arrow' ? (
-        <Ionicons name="chevron-forward" size={20} color={Colors.gray[400]} />
+        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
       ) : null}
     </Pressable>
   );
@@ -81,30 +133,44 @@ export default function SettingsScreen() {
     children: React.ReactNode;
   }) => (
     <View style={styles.section}>
-      <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
-      <GlassView intensity={40} style={styles.sectionContent}>
+      <ThemedText style={[styles.sectionTitle, { color: colors.textMuted }]}>
+        {title}
+      </ThemedText>
+      <GlassView
+        intensity={isDark ? 40 : 20}
+        style={[
+          styles.sectionContent,
+          { backgroundColor: colors.glassBackground },
+        ]}
+      >
         {children}
       </GlassView>
     </View>
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={
-          theme === 'dark'
-            ? Colors.gradients.profile
-            : Colors.lightGradients.profile
-        }
+        colors={getGradientArray('profile')}
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       />
 
       {/* Header */}
-      <BlurView intensity={80} tint="dark" style={styles.header}>
-        <Pressable onPress={handleBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="white" />
+      <BlurView
+        intensity={isDark ? 80 : 60}
+        tint={isDark ? 'dark' : 'light'}
+        style={styles.header}
+      >
+        <Pressable
+          onPress={handleBack}
+          style={[
+            styles.backButton,
+            { backgroundColor: colors.glassBackground },
+          ]}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Pressable>
         <ThemedText style={styles.headerTitle}>Settings</ThemedText>
         <View style={{ width: 40 }} />
@@ -114,42 +180,131 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* User Info Card */}
+        <GlassView intensity={isDark ? 50 : 30} style={styles.userCard}>
+          <View style={styles.userAvatar}>
+            <Ionicons name="person-circle" size={60} color={colors.primary} />
+          </View>
+          <View style={styles.userInfo}>
+            <ThemedText style={styles.userName}>{user.name}</ThemedText>
+            <ThemedText style={[styles.userEmail, { color: colors.textMuted }]}>
+              {user.email || 'Not signed in'}
+            </ThemedText>
+            {user.isPro && (
+              <View
+                style={[styles.proBadge, { backgroundColor: colors.primary }]}
+              >
+                <ThemedText style={styles.proBadgeText}>PRO</ThemedText>
+              </View>
+            )}
+          </View>
+        </GlassView>
+
         <Section title="Account">
-          <SettingItem icon="person-outline" label="Personal Information" />
-          <SettingItem icon="shield-checkmark-outline" label="Security" />
-          <SettingItem icon="card-outline" label="Subscription" />
-        </Section>
-
-        <Section title="Privacy & Data">
-          <SettingItem icon="lock-closed-outline" label="Privacy Policy" />
-          <SettingItem icon="cloud-download-outline" label="Download My Data" />
-          <SettingItem icon="trash-outline" label="Delete Account" />
-        </Section>
-
-        <Section title="Notifications">
           <SettingItem
-            icon="notifications-outline"
-            label="Push Notifications"
-            type="toggle"
-            value={true}
+            icon="person-outline"
+            label="Personal Information"
+            onPress={() =>
+              Alert.alert(
+                'Coming Soon',
+                'Profile editing will be available in a future update.'
+              )
+            }
           />
           <SettingItem
-            icon="mail-outline"
-            label="Email Updates"
-            type="toggle"
-            value={false}
+            icon="shield-checkmark-outline"
+            label="Security"
+            onPress={() =>
+              Alert.alert(
+                'Coming Soon',
+                'Security settings will be available in a future update.'
+              )
+            }
+          />
+          <SettingItem
+            icon="card-outline"
+            label="Subscription"
+            onPress={() =>
+              Alert.alert(
+                'Subscription',
+                user.isPro
+                  ? 'You have an active Pro subscription!'
+                  : 'Upgrade to Pro for unlimited features.'
+              )
+            }
           />
         </Section>
 
-        <Section title="App Preferences">
+        <Section title="Preferences">
           <SettingItem
             icon="moon-outline"
             label="Dark Mode"
             type="toggle"
-            value={theme === 'dark'}
+            value={isDark}
             onToggle={toggleTheme}
           />
-          <SettingItem icon="language-outline" label="Language" />
+          <SettingItem
+            icon="notifications-outline"
+            label="Push Notifications"
+            type="toggle"
+            value={notificationsEnabled}
+            onToggle={setNotificationsEnabled}
+          />
+          <SettingItem
+            icon="radio-outline"
+            label="Haptic Feedback"
+            type="toggle"
+            value={hapticEnabled}
+            onToggle={(val) => {
+              setHapticEnabled(val);
+              haptics.setEnabled(val);
+            }}
+          />
+          <SettingItem
+            icon="mic-outline"
+            label="Voice Features"
+            type="toggle"
+            value={voiceEnabled}
+            onToggle={setVoiceEnabled}
+          />
+        </Section>
+
+        <Section title="Privacy & Data">
+          <SettingItem
+            icon="lock-closed-outline"
+            label="Privacy Policy"
+            onPress={() =>
+              Alert.alert(
+                'Privacy Policy',
+                'View our privacy policy at happiness-ai.com/privacy'
+              )
+            }
+          />
+          <SettingItem
+            icon="cloud-download-outline"
+            label="Download My Data"
+            onPress={() =>
+              Alert.alert(
+                'Download Data',
+                'Your data export will be emailed to you within 24 hours.'
+              )
+            }
+          />
+          <SettingItem
+            icon="trash-outline"
+            label="Delete Account"
+            destructive
+            onPress={() =>
+              Alert.alert(
+                'Delete Account',
+                'This action cannot be undone. All your data will be permanently deleted.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Delete', style: 'destructive', onPress: () => {} },
+                ]
+              )
+            }
+          />
         </Section>
 
         <Section title="About">
@@ -158,12 +313,44 @@ export default function SettingsScreen() {
             label="Version 1.0.0"
             type="none"
           />
-          <SettingItem icon="document-text-outline" label="Terms of Service" />
+          <SettingItem
+            icon="document-text-outline"
+            label="Terms of Service"
+            onPress={() =>
+              Alert.alert(
+                'Terms of Service',
+                'View our terms at happiness-ai.com/terms'
+              )
+            }
+          />
+          <SettingItem
+            icon="help-circle-outline"
+            label="Help & Support"
+            onPress={() =>
+              Alert.alert('Support', 'Contact us at support@happiness-ai.com')
+            }
+          />
         </Section>
 
+        {isAuthenticated && (
+          <Section title="Account Actions">
+            <SettingItem
+              icon="log-out-outline"
+              label="Sign Out"
+              type="arrow"
+              destructive
+              onPress={handleLogout}
+            />
+          </Section>
+        )}
+
         <View style={styles.footer}>
-          <ThemedText style={styles.footerText}>Happiness AI</ThemedText>
-          <ThemedText style={styles.footerSubText}>
+          <ThemedText style={[styles.footerText, { color: colors.textMuted }]}>
+            Happiness AI
+          </ThemedText>
+          <ThemedText
+            style={[styles.footerSubText, { color: colors.textMuted }]}
+          >
             Designed for your well-being
           </ThemedText>
         </View>
@@ -175,7 +362,6 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -190,25 +376,55 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: 'white',
   },
   scrollContent: {
     padding: 20,
     paddingBottom: 100,
+  },
+  userCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: BorderRadius.lg,
+    marginBottom: 24,
+  },
+  userAvatar: {
+    marginRight: 16,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  userEmail: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  proBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 6,
+  },
+  proBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'white',
   },
   section: {
     marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 14,
-    color: Colors.gray[400],
     marginBottom: 8,
     marginLeft: 4,
     textTransform: 'uppercase',
@@ -217,7 +433,6 @@ const styles = StyleSheet.create({
   sectionContent: {
     borderRadius: BorderRadius.lg,
     overflow: 'hidden',
-    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   settingItem: {
     flexDirection: 'row',
@@ -225,10 +440,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   settingItemPressed: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    opacity: 0.8,
   },
   settingLeft: {
     flexDirection: 'row',
@@ -239,13 +453,11 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   settingLabel: {
     fontSize: 16,
-    color: 'white',
   },
   footer: {
     alignItems: 'center',
@@ -255,10 +467,8 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.gray[400],
   },
   footerSubText: {
     fontSize: 12,
-    color: Colors.gray[600],
   },
 });

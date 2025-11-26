@@ -1,8 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '@/constants/Theme';
 import * as Haptics from 'expo-haptics';
+import { colors as GrokColors } from '../../constants/GrokColors';
+import { GrokLayout } from '../../constants/GrokLayout';
+import { GrokTypography } from '../../constants/GrokTypography';
 
 interface MessageBubbleProps {
   role: 'user' | 'assistant';
@@ -30,58 +32,21 @@ export function MessageBubble({ role, content }: MessageBubbleProps) {
 
       {!isUser && (
         <View style={styles.actions}>
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => Haptics.selectionAsync()}
-          >
-            <Ionicons name="copy-outline" size={16} color={Colors.gray[400]} />
-          </Pressable>
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => Haptics.selectionAsync()}
-          >
-            <Ionicons name="share-outline" size={16} color={Colors.gray[400]} />
-          </Pressable>
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => Haptics.selectionAsync()}
-          >
-            <Ionicons
-              name="thumbs-up-outline"
-              size={16}
-              color={Colors.gray[400]}
-            />
-          </Pressable>
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => Haptics.selectionAsync()}
-          >
-            <Ionicons
-              name="thumbs-down-outline"
-              size={16}
-              color={Colors.gray[400]}
-            />
-          </Pressable>
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => Haptics.selectionAsync()}
-          >
-            <Ionicons
-              name="refresh-outline"
-              size={16}
-              color={Colors.gray[400]}
-            />
-          </Pressable>
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => Haptics.selectionAsync()}
-          >
-            <Ionicons
-              name="ellipsis-horizontal"
-              size={16}
-              color={Colors.gray[400]}
-            />
-          </Pressable>
+          {[
+            { icon: 'copy-outline', label: 'Copy' },
+            { icon: 'share-outline', label: 'Share' },
+            { icon: 'thumbs-up-outline', label: 'Good' },
+            { icon: 'thumbs-down-outline', label: 'Bad' },
+            { icon: 'refresh-outline', label: 'Regenerate' },
+          ].map(({ icon, label }) => (
+            <Pressable
+              key={label}
+              style={styles.actionButton}
+              onPress={() => Haptics.selectionAsync()}
+            >
+              <Ionicons name={icon as any} size={17} color={GrokColors.muted} />
+            </Pressable>
+          ))}
         </View>
       )}
     </View>
@@ -90,8 +55,8 @@ export function MessageBubble({ role, content }: MessageBubbleProps) {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 20,
-    maxWidth: '85%',
+    maxWidth: GrokLayout.messageBubble.maxWidth,
+    marginBottom: GrokLayout.spacing.md,
   },
   userContainer: {
     alignSelf: 'flex-end',
@@ -100,28 +65,38 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   bubble: {
-    padding: 16,
-    borderRadius: 20,
+    padding: GrokLayout.messageBubble.padding,
+    borderRadius: GrokLayout.messageBubble.borderRadius,
   },
   userBubble: {
-    backgroundColor: '#212327', // Grok User Bubble
+    backgroundColor: GrokColors.userBubble,
     borderBottomRightRadius: 4,
   },
   assistantBubble: {
-    backgroundColor: 'transparent', // Minimalist assistant
-    paddingLeft: 0,
+    backgroundColor: GrokColors.assistantBubble,
+    borderBottomLeftRadius: 4,
+    // Remove border/background if transparent desired,
+    // but Grok uses card color
   },
   text: {
-    color: 'white',
-    fontSize: 16,
-    lineHeight: 24,
+    color: GrokColors.primary,
+    fontSize: GrokTypography.fontSizes.base,
+    // FIX: React Native lineHeight is pixels, not a multiplier.
+    // Multiplier 1.5 -> 1.5px height -> Glitch.
+    // Calculation: 16 * 1.5 = 24px
+    lineHeight:
+      GrokTypography.fontSizes.base * GrokTypography.lineHeights.normal,
   },
   actions: {
     flexDirection: 'row',
-    marginTop: 8,
-    gap: 12,
+    marginTop: GrokLayout.spacing.sm,
+    gap: GrokLayout.spacing.lg,
+    paddingLeft: GrokLayout.spacing.sm,
+    paddingRight: GrokLayout.spacing.sm,
+    opacity: 0.85,
   },
   actionButton: {
-    padding: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
   },
 });

@@ -1,401 +1,251 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   TextInput,
   StyleSheet,
   Pressable,
-  LayoutAnimation,
+  Text,
+  Modal,
+  TouchableWithoutFeedback,
+  Keyboard,
   Platform,
-  UIManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MotiView } from 'moti';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-
+import { MotiView } from 'moti';
 import { Colors } from '../../constants/Theme';
-import { GlassView } from '../Glass/GlassView';
 
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-interface ChatComposerProps {
-  onSend?: (text: string) => void;
-  messages?: any[];
+interface ChatInputProps {
+  onSend: (text: string) => void;
   voiceMode: boolean;
   onToggleVoiceMode: () => void;
 }
 
-export default function ChatComposer({
+export default function ChatInput({
   onSend,
   voiceMode,
   onToggleVoiceMode,
-}: ChatComposerProps) {
+}: ChatInputProps) {
   const [text, setText] = useState('');
   const [showAttachments, setShowAttachments] = useState(false);
 
-  const handleToggleVoiceMode = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    console.log('Toggling Voice Mode:', !voiceMode);
-
-    LayoutAnimation.configureNext({
-      duration: 500,
-      create: {
-        type: LayoutAnimation.Types.spring,
-        property: LayoutAnimation.Properties.scaleXY,
-        springDamping: 0.8,
-      },
-      update: {
-        type: LayoutAnimation.Types.spring,
-        springDamping: 0.8,
-      },
-      delete: {
-        type: LayoutAnimation.Types.linear,
-        property: LayoutAnimation.Properties.opacity,
-        duration: 200,
-      },
-    });
-    onToggleVoiceMode();
-  };
-
-  const toggleAttachments = async () => {
-    await Haptics.selectionAsync();
-    setShowAttachments(!showAttachments);
-  };
-
-  const handleSend = async () => {
+  const handleSend = () => {
     if (!text.trim()) return;
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    console.log('Send:', text);
-    onSend?.(text);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onSend(text);
     setText('');
   };
 
-  const handleAttachmentAction = async (action: string) => {
-    await Haptics.selectionAsync();
-    setShowAttachments(false);
-    console.log('Action Selected', action);
+  const handleToggleVoice = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onToggleVoiceMode();
+  };
+
+  const toggleAttachments = () => {
+    Haptics.selectionAsync();
+    Keyboard.dismiss();
+    setShowAttachments(!showAttachments);
   };
 
   return (
-    <View style={styles.container}>
-      {/* Voice Mode Controls (Above Composer) */}
-      {voiceMode && (
-        <View style={styles.voiceModeContainer}>
-          {/* Status Indicator */}
-          <View style={styles.statusContainer}>
+    <>
+      <View style={styles.container}>
+        <View style={styles.pillContainer}>
+          {/* Left: Attachment */}
+          <Pressable style={styles.iconButton} onPress={toggleAttachments}>
             <Ionicons
-              name="bar-chart-outline"
-              size={16}
+              name="add-circle-outline"
+              size={28}
               color={Colors.gray[400]}
             />
-            <Text style={styles.statusText}>Start talking</Text>
-          </View>
-
-          {/* 4 Action Buttons */}
-          <View style={styles.voiceControlsRow}>
-            {[
-              { icon: 'videocam-off-outline', active: false },
-              { icon: 'volume-medium-outline', active: true },
-              { icon: 'mic', active: true },
-              { icon: 'settings-outline', active: false },
-            ].map((item, idx) => (
-              <GlassView
-                key={idx}
-                intensity={20}
-                style={styles.voiceControlBtn}
-              >
-                <Ionicons
-                  name={item.icon as any}
-                  size={24}
-                  color={item.active ? 'white' : Colors.gray[400]}
-                />
-              </GlassView>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {/* Attachment Menu Overlay */}
-      {showAttachments && (
-        <MotiView
-          from={{ opacity: 0, translateY: 20 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          style={styles.attachmentMenu}
-        >
-          <GlassView intensity={90} style={styles.attachmentGlass}>
-            {[
-              { label: 'Camera', icon: 'camera-outline' },
-              { label: 'Photos', icon: 'images-outline' },
-              { label: 'Files', icon: 'document-text-outline' },
-              {
-                label: 'Create image',
-                icon: 'color-wand-outline',
-                highlight: true,
-              },
-            ].map((item, index) => (
-              <Pressable
-                key={index}
-                style={[
-                  styles.attachmentItem,
-                  item.highlight && styles.highlightedItem,
-                ]}
-                onPress={() => handleAttachmentAction(item.label)}
-              >
-                <Ionicons name={item.icon as any} size={20} color="white" />
-                <Text style={styles.attachmentText}>{item.label}</Text>
-              </Pressable>
-            ))}
-          </GlassView>
-        </MotiView>
-      )}
-
-      {/* Main Composer Panel */}
-      {voiceMode ? (
-        // Voice Mode Composer (Compact Input + Stop)
-        <View style={styles.voiceComposerRow}>
-          <GlassView intensity={80} style={styles.voiceInputPill}>
-            <TextInput
-              style={styles.voiceInput}
-              placeholder="Ask Anything"
-              placeholderTextColor={Colors.gray[500]}
-              value={text}
-              onChangeText={setText}
-              editable={false} // Input disabled in voice mode usually? Or maybe active for corrections.
-            />
-          </GlassView>
-          <Pressable
-            style={styles.stopButton}
-            onPress={handleToggleVoiceMode}
-            hitSlop={10}
-          >
-            <Ionicons name="square" size={12} color="black" />
-            <Text style={styles.stopText}>Stop</Text>
           </Pressable>
-        </View>
-      ) : (
-        // Standard Composer Panel
-        <GlassView intensity={80} style={styles.composerPanel}>
-          <View style={styles.panelContent}>
-            {/* Top: Input */}
-            <TextInput
-              style={styles.input}
-              placeholder="Ask Anything"
-              placeholderTextColor={Colors.gray[500]}
-              value={text}
-              onChangeText={setText}
-              multiline
-              maxLength={1000}
-            />
 
-            {/* Bottom Row: Controls */}
-            <View style={styles.controlsRow}>
-              <View style={styles.leftControls}>
-                {/* Attachment */}
-                <Pressable
-                  style={styles.iconButton}
-                  onPress={toggleAttachments}
-                >
-                  <Ionicons name="attach" size={24} color={Colors.gray[400]} />
-                </Pressable>
-              </View>
+          {/* Middle: Input */}
+          <TextInput
+            style={styles.input}
+            placeholder="Ask Anything"
+            placeholderTextColor={Colors.gray[500]}
+            value={text}
+            onChangeText={setText}
+            multiline
+            maxLength={1000}
+          />
 
-              {/* Right: Speak/Send */}
-              {text.trim().length > 0 ? (
-                <Pressable style={styles.sendButton} onPress={handleSend}>
-                  <Ionicons name="arrow-up" size={20} color="black" />
-                </Pressable>
+          {/* Right: Speak/Stop or Send */}
+          {text.trim().length > 0 ? (
+            <Pressable style={styles.sendButton} onPress={handleSend}>
+              <Ionicons name="arrow-up" size={20} color="black" />
+            </Pressable>
+          ) : (
+            <Pressable
+              style={[
+                styles.voiceButton,
+                voiceMode && styles.voiceButtonActive,
+              ]}
+              onPress={handleToggleVoice}
+            >
+              {voiceMode ? (
+                <View style={styles.stopIcon} />
               ) : (
-                <Pressable
-                  style={styles.speakButton}
-                  onPress={handleToggleVoiceMode}
-                  hitSlop={10}
-                >
-                  <Ionicons name="mic" size={18} color="black" />
-                  <Text style={styles.speakText}>Speak</Text>
-                </Pressable>
+                <Text style={styles.voiceButtonText}>Speak</Text>
               )}
-            </View>
+            </Pressable>
+          )}
+        </View>
+      </View>
+
+      {/* Attachment Overlay */}
+      <Modal
+        visible={showAttachments}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAttachments(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowAttachments(false)}>
+          <View style={styles.overlayBackdrop}>
+            <TouchableWithoutFeedback>
+              <MotiView
+                from={{ translateY: 200, opacity: 0 }}
+                animate={{ translateY: 0, opacity: 1 }}
+                transition={{ type: 'timing', duration: 250 }}
+                style={styles.overlayPanel}
+              >
+                <BlurView
+                  intensity={80}
+                  tint="dark"
+                  style={styles.blurContainer}
+                >
+                  <View style={styles.attachmentOptions}>
+                    {[
+                      { label: 'Photo', icon: 'image-outline' },
+                      { label: 'Camera', icon: 'camera-outline' },
+                      { label: 'File', icon: 'document-text-outline' },
+                    ].map((opt) => (
+                      <Pressable
+                        key={opt.label}
+                        style={styles.attachmentOption}
+                        onPress={() => {
+                          Haptics.selectionAsync();
+                          setShowAttachments(false);
+                        }}
+                      >
+                        <View style={styles.optionIcon}>
+                          <Ionicons
+                            name={opt.icon as any}
+                            size={24}
+                            color="white"
+                          />
+                        </View>
+                        <Text style={styles.optionLabel}>{opt.label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </BlurView>
+              </MotiView>
+            </TouchableWithoutFeedback>
           </View>
-        </GlassView>
-      )}
-    </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
-    paddingHorizontal: 12,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 12,
+    paddingHorizontal: 16,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 16,
+    paddingTop: 8,
+    backgroundColor: 'transparent',
   },
-  // Voice Mode
-  voiceModeContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  statusContainer: {
+  pillContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 20,
-  },
-  statusText: {
-    color: Colors.gray[400],
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  voiceControlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  voiceControlBtn: {
-    width: 56, // Slightly smaller
-    height: 56,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // Removed background/border to fix "double icon" look
-  },
-  // Voice Composer
-  voiceComposerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    height: 50, // Explicit height for "shrunk" feel
-  },
-  voiceInputPill: {
-    flex: 1,
-    height: '100%',
-    borderRadius: 25,
-    backgroundColor: 'rgba(20, 20, 25, 0.85)',
+    backgroundColor: '#1A1C20',
+    borderRadius: 30,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    minHeight: 56,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  voiceInput: {
-    color: 'white',
-    fontSize: 16,
-  },
-  stopButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'white',
-    paddingHorizontal: 20,
-    height: '100%',
-    borderRadius: 25,
-    minWidth: 100,
-  },
-  stopText: {
-    color: 'black',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  // Composer Panel
-  composerPanel: {
-    borderRadius: 32,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(20, 20, 25, 0.85)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  panelContent: {
-    padding: 16,
-    gap: 12,
-  },
-  input: {
-    color: 'white',
-    fontSize: 18,
-    minHeight: 40,
-    maxHeight: 120,
-    padding: 0,
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  leftControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
   },
   iconButton: {
     padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  modelSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  input: {
+    flex: 1,
+    color: 'white',
+    fontSize: 16,
+    maxHeight: 100,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingVertical: 4, // Center text vertically
   },
-  modelSelectorText: {
-    color: Colors.gray[200],
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  speakButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'white',
-    paddingHorizontal: 20,
+  voiceButton: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 24,
+    borderRadius: 20,
+    marginLeft: 8,
   },
-  speakText: {
-    color: 'black',
-    fontSize: 15,
-    fontWeight: '700',
+  voiceButtonActive: {
+    backgroundColor: 'white',
+  },
+  voiceButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  stopIcon: {
+    width: 14,
+    height: 14,
+    backgroundColor: 'black',
+    borderRadius: 2,
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 8,
   },
-  // Attachment Menu
-  attachmentMenu: {
-    position: 'absolute',
-    bottom: 100,
-    left: 16,
-    width: 220,
-    zIndex: 999,
+  // Overlay
+  overlayBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
   },
-  attachmentGlass: {
-    borderRadius: 20,
+  overlayPanel: {
+    margin: 16,
+    marginBottom: 40,
+    borderRadius: 24,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(30, 30, 35, 0.3)',
   },
-  attachmentItem: {
-    flexDirection: 'row',
+  blurContainer: {
+    padding: 24,
     alignItems: 'center',
-    gap: 12,
-    padding: 14,
   },
-  highlightedItem: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+  attachmentOptions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
   },
-  attachmentText: {
+  attachmentOption: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  optionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  optionLabel: {
     color: 'white',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '500',
   },
 });

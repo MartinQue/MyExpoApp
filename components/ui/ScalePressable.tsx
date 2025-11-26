@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { ReactNode } from 'react';
 import { Pressable, PressableProps, StyleProp, ViewStyle } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -7,10 +7,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
-interface ScalePressableProps extends PressableProps {
+interface ScalePressableProps extends Omit<PressableProps, 'children'> {
   scaleTo?: number;
   style?: StyleProp<ViewStyle>;
   activeOpacity?: number;
+  children?: ReactNode;
 }
 
 export function ScalePressable({

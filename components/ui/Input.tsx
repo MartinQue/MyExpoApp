@@ -24,7 +24,7 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: Colors.gray[800],
-    borderRadius: BorderRadius.pill,
+    borderRadius: BorderRadius.full,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     color: Colors.white,

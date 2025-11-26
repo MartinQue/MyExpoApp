@@ -64,18 +64,18 @@ export const Colors = {
 
   // Tab Gradients (Deep, Premium Backgrounds)
   gradients: {
-    profile: ['#1E1A28', '#3D2F4A'], // Mystic Purple
-    planner: ['#1A2820', '#2F4A3D'], // Zen Green
-    library: ['#1E1A28', '#2D3748'], // Deep Ocean
-    chat: ['#000000', '#111111'], // Void Black
-    imagine: ['#2E1065', '#4C1D95'], // Cosmic Violet
+    profile: ['#1E1A28', '#3D2F4A'] as const, // Mystic Purple
+    planner: ['#1A2820', '#2F4A3D'] as const, // Zen Green
+    library: ['#1E1A28', '#2D3748'] as const, // Deep Ocean
+    chat: ['#000000', '#111111'] as const, // Void Black
+    imagine: ['#2E1065', '#4C1D95'] as const, // Cosmic Violet
   },
   lightGradients: {
-    profile: ['#E6E6FA', '#D8BFD8'], // Lavender / Thistle
-    planner: ['#E0F2F1', '#B2DFDB'], // Light Teal
-    library: ['#E3F2FD', '#BBDEFB'], // Light Blue
-    chat: ['#F5F5F5', '#E0E0E0'], // Light Gray
-    imagine: ['#F3E5F5', '#E1BEE7'], // Light Purple
+    profile: ['#E6E6FA', '#D8BFD8'] as const, // Lavender / Thistle
+    planner: ['#E0F2F1', '#B2DFDB'] as const, // Light Teal
+    library: ['#E3F2FD', '#BBDEFB'] as const, // Light Blue
+    chat: ['#F5F5F5', '#E0E0E0'] as const, // Light Gray
+    imagine: ['#F3E5F5', '#E1BEE7'] as const, // Light Purple
   },
 };
 

@@ -18,6 +18,7 @@ const { width } = Dimensions.get('window');
 interface AnimatedAvatarProps {
   isListening?: boolean;
   isSpeaking?: boolean;
+  isThinking?: boolean;
   size?: number;
   fullScreen?: boolean;
 }
@@ -25,6 +26,7 @@ interface AnimatedAvatarProps {
 export function AnimatedAvatar({
   isListening = false,
   isSpeaking = false,
+  isThinking = false,
   size = 150,
   fullScreen = false,
 }: AnimatedAvatarProps) {
@@ -67,6 +69,17 @@ export function AnimatedAvatar({
         true
       );
       glowOpacity.value = withTiming(0.8);
+    } else if (isThinking) {
+        // Thinking state - slower deep pulse
+        coreScale.value = withRepeat(
+            withSequence(
+              withTiming(1.15, { duration: 1500 }),
+              withTiming(0.85, { duration: 1500 })
+            ),
+            -1,
+            true
+        );
+        glowOpacity.value = withTiming(0.6);
     } else if (isListening) {
       // Gentle expansion when listening
       coreScale.value = withTiming(1.1, { duration: 500 });
@@ -83,7 +96,7 @@ export function AnimatedAvatar({
       coreScale.value = withTiming(1, { duration: 500 });
       glowOpacity.value = withTiming(0.5, { duration: 500 });
     }
-  }, [isSpeaking, isListening, coreScale, glowOpacity]);
+  }, [isSpeaking, isListening, isThinking, coreScale, glowOpacity]);
 
   const containerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulse.value }],
