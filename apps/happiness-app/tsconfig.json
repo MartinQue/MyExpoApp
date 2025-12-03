@@ -1,0 +1,24 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "jsx": "react-native",
+    "paths": {
+      "@/*": ["./*"]
+    },
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  "exclude": [
+    "expo-docs-mcp/**",
+    "Happiness AI Multi-Agent App (Copy)/**",
+    "**/*.legacy.tsx",
+    "**/*.legacy.ts",
+    ".backup_old_frontend/**",
+    ".backend_safe_haven/**",
+    "hooks/hooks/**",
+    "node_modules/**"
+  ]
+}
