@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useCallback, useState, forwardRef, useImperativeHandle } from 'react';
 import { View, StyleSheet } from 'react-native';
-import Live2DAvatar, { Live2DAvatarRef, Live2DExpression, Live2DModel } from './Live2DAvatar';
-import SimpleAnimatedAvatar from './SimpleAnimatedAvatar';
+import AnimeAvatar from './AnimeAvatar';
 
 export type AvatarState =
   | 'idle'
@@ -12,17 +11,16 @@ export type AvatarState =
   | 'surprised'
   | 'sad';
 
-const STATE_TO_EXPRESSION: Record<AvatarState, Live2DExpression> = {
-  idle: 'idle',
-  listening: 'listening',
-  thinking: 'thinking',
-  speaking: 'speaking',
-  happy: 'happy',
-  surprised: 'surprised',
-  sad: 'sad',
-};
+export type Live2DModel = 'hiyori' | 'haru' | 'shizuku' | 'mao' | 'hijiki' | 'tororo';
 
-const USE_SIMPLE_AVATAR = false;
+const MODEL_COLORS: Record<Live2DModel, string> = {
+  hiyori: '#60A5FA',
+  haru: '#F97316',
+  shizuku: '#8B5CF6',
+  mao: '#F472B6',
+  hijiki: '#22D3EE',
+  tororo: '#10B981',
+};
 
 export interface AvatarControllerRef {
   playAudio: (audioUrl: string) => void;
@@ -49,83 +47,25 @@ const AvatarController = forwardRef<AvatarControllerRef, AvatarControllerProps>(
   onTouched,
   style
 }, ref) => {
-  const avatarRef = useRef<Live2DAvatarRef>(null);
-  const currentStateRef = useRef<AvatarState>(state);
-  const isSpeakingRef = useRef(isSpeaking);
-  const [isReady, setIsReady] = useState(false);
+  useEffect(() => {
+    onReady?.();
+    onModelLoaded?.(model);
+  }, []);
 
   useImperativeHandle(ref, () => ({
     playAudio: (audioUrl: string) => {
-      if (avatarRef.current) {
-        avatarRef.current.playAudio(audioUrl);
-      }
     }
   }), []);
 
-  useEffect(() => {
-    if (!avatarRef.current || !isReady) return;
-
-    const expression = STATE_TO_EXPRESSION[state] || 'idle';
-    avatarRef.current.setExpression(expression);
-    currentStateRef.current = state;
-  }, [state, isReady]);
-
-  useEffect(() => {
-    if (!avatarRef.current || !isReady) return;
-
-    if (isSpeaking && !isSpeakingRef.current) {
-      avatarRef.current.startLipSync();
-      isSpeakingRef.current = true;
-    } else if (!isSpeaking && isSpeakingRef.current) {
-      avatarRef.current.stopLipSync();
-      isSpeakingRef.current = false;
-    }
-  }, [isSpeaking, isReady]);
-
-  useEffect(() => {
-    if (!avatarRef.current || !isReady) return;
-    avatarRef.current.loadModel(model);
-  }, [model, isReady]);
-
-  const handleReady = useCallback(() => {
-    setIsReady(true);
-    onReady?.();
-  }, [onReady]);
-
-  const handleModelLoaded = useCallback((modelName: string) => {
-    onModelLoaded?.(modelName);
-  }, [onModelLoaded]);
-
-  const handleError = useCallback((error: string) => {
-    onError?.(error);
-  }, [onError]);
-
-  const handleTouched = useCallback(() => {
-    onTouched?.();
-  }, [onTouched]);
-
-  if (USE_SIMPLE_AVATAR) {
-    return (
-      <View style={[styles.container, style]}>
-        <SimpleAnimatedAvatar
-          state={state}
-          isSpeaking={isSpeaking}
-          style={styles.avatar}
-        />
-      </View>
-    );
-  }
+  const primaryColor = MODEL_COLORS[model] || '#8B5CF6';
 
   return (
     <View style={[styles.container, style]}>
-      <Live2DAvatar
-        ref={avatarRef}
-        initialModel={model}
-        initialExpression={STATE_TO_EXPRESSION[state]}
-        onReady={handleReady}
-        onModelLoaded={handleModelLoaded}
-        onError={handleError}
-        onTouched={handleTouched}
+      <AnimeAvatar
+        model={model}
+        state={state}
+        isSpeaking={isSpeaking}
+        primaryColor={primaryColor}
         style={styles.avatar}
       />
     </View>

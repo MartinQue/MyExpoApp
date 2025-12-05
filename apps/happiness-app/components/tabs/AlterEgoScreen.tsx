@@ -12,7 +12,6 @@ import {
   Alert,
   Modal,
   TouchableWithoutFeedback,
-  Image,
   ScrollView,
   KeyboardAvoidingView,
 } from 'react-native';
@@ -163,13 +162,17 @@ function AvatarCard({
         >
           <View style={[styles.cardInner, { backgroundColor: glassBg }]}>
             <View style={styles.avatarImageContainer}>
-              <Image
-                source={{ uri: avatar.avatarImage }}
-                style={styles.avatarImage}
-                resizeMode="cover"
-              />
               <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.7)']}
+                colors={[avatar.colors.primary, avatar.colors.secondary, avatar.colors.glow]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatarImage}
+              />
+              <View style={styles.avatarEmojiContainer}>
+                <Text style={styles.avatarEmoji}>{avatar.emoji}</Text>
+              </View>
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.5)']}
                 style={styles.avatarGradient}
               />
               {isSelected && (
@@ -730,6 +733,14 @@ const styles = StyleSheet.create({
   avatarImage: {
     width: '100%',
     height: '100%',
+  },
+  avatarEmojiContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarEmoji: {
+    fontSize: 48,
   },
   avatarGradient: {
     ...StyleSheet.absoluteFillObject,
