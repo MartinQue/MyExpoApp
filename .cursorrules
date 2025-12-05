@@ -1,0 +1,459 @@
+# Cursor AI Rules for MyExpoApp Monorepo
+
+You are an expert React Native + Expo developer working on a production-grade monorepo. Follow these rules strictly.
+
+## 🎯 Project Context
+
+This is a **monorepo** with multiple Expo/React Native apps sharing common configuration and packages.
+
+### Monorepo Structure
+- `apps/` - All applications (happiness-app, future apps)
+- `packages/` - Shared code (shared-config, future packages)
+- Root `.env.local` - Environment variables (shared across all apps)
+
+### Current Apps
+- **happiness-app**: AI-powered multi-agent companion (production-ready)
+
+### Technology Stack
+- **Runtime**: React Native 0.81.5 (Expo SDK 54)
+- **Language**: TypeScript 5.9 (strict mode)
+- **Navigation**: Expo Router (file-based)
+- **State**: Zustand + React Context
+- **UI**: Custom Glassmorphism components
+- **Styling**: NativeWind + StyleSheet
+- **Animation**: Reanimated 4 + Moti
+- **Backend**: Supabase + LangGraph (Python)
+- **AI**: OpenAI GPT-4, DALL-E 3, Whisper, ElevenLabs
+
+## 📐 Core Architecture Rules
+
+### 1. Monorepo Boundaries
+- ✅ **DO**: Put app code in `apps/[app-name]/`
+- ✅ **DO**: Put shared code in `packages/[package-name]/`
+- ❌ **NEVER**: Mix app-specific code in root
+- ❌ **NEVER**: Import directly between apps
+
+### 2. File Structure
+Every app follows this structure:
+```
+apps/[app-name]/
+├── app/              # Expo Router pages
+├── components/       # React components
+├── stores/           # Zustand stores
+├── contexts/         # React Contexts
+├── hooks/            # Custom hooks
+├── lib/              # Services & business logic
+├── constants/        # Design system
+├── types/            # TypeScript types
+├── utils/            # Pure utilities
+└── assets/           # Static files
+```
+
+### 3. Import Rules
+```typescript
+// ✅ CORRECT - Use @ alias
+import { useChat } from '@/hooks/useChat';
+import config from '@myexpoapp/shared-config';
+
+// ❌ WRONG - Relative paths
+import { useChat } from '../../../hooks/useChat';
+```
+
+## 🎨 UI/UX Patterns
+
+### Glassmorphism Design System
+ALL UI components MUST use glassmorphism:
+
+```typescript
+import { BlurView } from 'expo-blur';
+
+const Component = () => (
+  <BlurView
+    intensity={80}
+    tint="light" // or "dark" based on theme
+    style={styles.glass}
+  >
+    <View style={styles.inner}>{/* content */}</View>
+  </BlurView>
+);
+
+const styles = StyleSheet.create({
+  glass: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  inner: {
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+});
+```
+
+### Theme Integration
+```typescript
+// ✅ ALWAYS use theme
+import { useTheme } from '@/contexts/ThemeContext';
+
+const Component = () => {
+  const { theme, colors } = useTheme();
+  return <Text style={{ color: colors.text }}>Content</Text>;
+};
+```
+
+### Haptic Feedback
+```typescript
+// ✅ ALWAYS add haptics to interactions
+import { useHaptics } from '@/hooks/useHaptics';
+
+const Button = ({ onPress }) => {
+  const { triggerHaptic } = useHaptics();
+
+  const handlePress = () => {
+    triggerHaptic('impact', 'light');
+    onPress();
+  };
+
+  return <Pressable onPress={handlePress}>...</Pressable>;
+};
+```
+
+## 📦 State Management
+
+### Zustand Pattern (Preferred)
+```typescript
+import { create } from 'zustand';
+
+interface FeatureState {
+  data: Data[];
+  isLoading: boolean;
+  setData: (data: Data[]) => void;
+  reset: () => void;
+}
+
+export const useFeatureStore = create<FeatureState>((set) => ({
+  data: [],
+  isLoading: false,
+  setData: (data) => set({ data }),
+  reset: () => set({ data: [], isLoading: false }),
+}));
+```
+
+### React Context (Limited)
+Only use Context for:
+- Theme (light/dark mode)
+- Auth (user session)
+- Voice (recording state)
+
+❌ Don't use Context for feature state, UI state, or form state.
+
+## 🔌 Service Layer Pattern
+
+ALL API calls MUST go through services:
+
+```typescript
+// lib/services/FeatureService.ts
+export class FeatureService {
+  static async getData(userId: string): Promise<Data[]> {
+    const { data, error } = await supabase
+      .from('table')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (error) throw error;
+    return data;
+  }
+}
+
+// ❌ NEVER call APIs directly from components
+```
+
+## 🌐 Environment Variables
+
+```typescript
+// ✅ CORRECT - Use shared-config
+import config from '@myexpoapp/shared-config';
+const apiKey = config.OPENAI_API_KEY;
+
+// ❌ WRONG - Direct process.env
+const key = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+```
+
+## 🤖 Multi-Agent System
+
+### Agent Communication
+```typescript
+import { langgraphClient } from '@/lib/agents/AgentManager';
+
+const sendToAgent = async (message: string) => {
+  const result = await langgraphClient.invoke({
+    input: message,
+    config: { configurable: { thread_id: userId } },
+  });
+
+  return result; // { agent_used, response }
+};
+```
+
+### Available Agents
+- Supervisor (routes to specialists)
+- Finance, Health, Relationships, Career
+- Mindfulness, Creativity, Goals, General
+
+## ✍️ Code Generation Rules
+
+When generating code:
+
+### 1. Component Template
+```typescript
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useHaptics } from '@/hooks/useHaptics';
+
+interface ComponentProps {
+  title: string;
+  onPress?: () => void;
+}
+
+export const Component = ({ title, onPress }: ComponentProps) => {
+  const { theme, colors } = useTheme();
+  const { triggerHaptic } = useHaptics();
+
+  const handlePress = () => {
+    triggerHaptic('impact', 'light');
+    onPress?.();
+  };
+
+  return (
+    <BlurView intensity={80} tint={theme} style={styles.container}>
+      <Text style={[styles.title, { color: colors.text }]}>
+        {title}
+      </Text>
+    </BlurView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+});
+```
+
+### 2. Store Template
+```typescript
+import { create } from 'zustand';
+
+interface State {
+  data: DataType[];
+  isLoading: boolean;
+  error: string | null;
+  fetchData: () => Promise<void>;
+  reset: () => void;
+}
+
+export const useStore = create<State>((set) => ({
+  data: [],
+  isLoading: false,
+  error: null,
+
+  fetchData: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const data = await Service.getData();
+      set({ data, isLoading: false });
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+    }
+  },
+
+  reset: () => set({ data: [], isLoading: false, error: null }),
+}));
+```
+
+### 3. Service Template
+```typescript
+import { supabase } from '@/lib/supabase';
+
+export class Service {
+  static async getData(params: Params): Promise<Data[]> {
+    const { data, error } = await supabase
+      .from('table')
+      .select('*')
+      .eq('field', params.value);
+
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  static async createData(input: Input): Promise<Data> {
+    const { data, error } = await supabase
+      .from('table')
+      .insert(input)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return data;
+  }
+}
+```
+
+## 🚫 Never Do This
+
+### Imports
+```typescript
+// ❌ NEVER
+import '../../../utils/helper';           // Use @ alias
+import { something } from 'apps/other-app'; // Don't cross app boundaries
+```
+
+### Types
+```typescript
+// ❌ NEVER
+const data: any = fetchData();            // Use proper types
+let value;                                 // Always type variables
+```
+
+### State
+```typescript
+// ❌ NEVER
+const [messages, setMessages] = useState([]); // Use Zustand for complex state
+```
+
+### Styling
+```typescript
+// ❌ NEVER
+<View style={{ backgroundColor: '#FF0000' }}>  // Use theme colors
+<View style={{ padding: 10 }}>                 // Use design system spacing
+```
+
+### API Calls
+```typescript
+// ❌ NEVER
+const response = await fetch('https://api.example.com'); // Use service layer
+```
+
+## ✅ Always Do This
+
+### TypeScript
+```typescript
+// ✅ ALWAYS
+- Use strict TypeScript
+- Define interfaces for all props
+- Type all function returns
+- No `any` types (use `unknown` if needed)
+```
+
+### Imports
+```typescript
+// ✅ ALWAYS
+- Use @ alias for local imports
+- Import types explicitly
+- Group imports (React, libs, local)
+```
+
+### Components
+```typescript
+// ✅ ALWAYS
+- Use glassmorphism UI
+- Add haptic feedback
+- Support light/dark themes
+- Handle loading states
+- Handle error states
+- Memoize when appropriate
+```
+
+### State
+```typescript
+// ✅ ALWAYS
+- Use Zustand for feature state
+- Use Context for global app state
+- Include reset() in stores
+- Handle async errors
+```
+
+## 📝 Naming Conventions
+
+| Type | Convention | Example |
+|------|-----------|---------|
+| Components | PascalCase | `ChatInputBar.tsx` |
+| Hooks | camelCase (use prefix) | `useChat.ts` |
+| Stores | camelCase (Store suffix) | `chatStore.ts` |
+| Services | PascalCase (Service suffix) | `ChatService.ts` |
+| Types | PascalCase | `Message`, `UserProfile` |
+| Constants | UPPER_SNAKE_CASE | `API_ENDPOINT` |
+
+## 🔍 Before Generating Code
+
+1. **Check existing patterns** in `apps/happiness-app/`
+2. **Read BMAD_RULES.md** for detailed rules
+3. **Review .context/** for examples
+4. **Confirm** file location matches monorepo structure
+5. **Verify** imports use correct aliases
+
+## 🎯 Code Quality Checklist
+
+Before submitting code, ensure:
+- [ ] TypeScript with proper types (no `any`)
+- [ ] Glassmorphism UI pattern applied
+- [ ] Haptic feedback on interactions
+- [ ] Theme support (light/dark)
+- [ ] Loading and error states
+- [ ] Service layer for API calls
+- [ ] Zustand for state management
+- [ ] @ alias for imports
+- [ ] No console.log
+- [ ] No hardcoded colors
+- [ ] Follows naming conventions
+- [ ] Works on iOS, Android, Web
+
+## 📚 Reference Documents
+
+For detailed rules, see:
+- `/BMAD_RULES.md` - Complete architecture rules
+- `/MONOREPO_GUIDE.md` - Monorepo structure
+- `/.context/patterns.md` - Code patterns
+- `/.context/examples/` - Example implementations
+
+## 🚀 Common Tasks
+
+### Adding a New Screen
+1. Create in `apps/[app]/app/[screen].tsx`
+2. Use glassmorphism components
+3. Add to navigation if needed
+4. Create Zustand store if needed
+5. Create service for API calls
+
+### Adding a New Component
+1. Create in `apps/[app]/components/[feature]/[Component].tsx`
+2. Use component template above
+3. Add proper TypeScript types
+4. Apply glassmorphism styling
+5. Add haptic feedback
+
+### Adding State Management
+1. Create store in `apps/[app]/stores/[feature]Store.ts`
+2. Use Zustand store template
+3. Include reset() method
+4. Keep logic in services
+
+### Adding API Integration
+1. Create service in `apps/[app]/lib/services/[Feature]Service.ts`
+2. Use service template above
+3. Handle errors properly
+4. Return typed data
+
+---
+
+**Remember**: Consistency is key. When in doubt, look at existing code in `apps/happiness-app/` as the reference implementation.

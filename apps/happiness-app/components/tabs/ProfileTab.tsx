@@ -8,6 +8,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,19 +29,29 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useUserStore } from '@/stores/userStore';
 import { usePlannerStore } from '@/stores/plannerStore';
 import * as haptics from '@/lib/haptics';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { NextTaskCard } from '@/components/home/NextTaskCard';
 import { FeedCard } from '@/components/home/FeedCard';
+import { CardDetailModal } from '@/components/home/CardDetailModal';
 import {
   buildHomeFeed,
   getTimeContext,
   getDailyStats,
+  refreshContextCards,
   FeedCard as FeedCardType,
   DailyStats,
 } from '@/lib/homeFeed';
+import {
+  getLocationContext,
+  getLocationPermission,
+  formatLocation,
+  getLocationGreeting,
+  LocationContext,
+} from '@/lib/locationService';
 
 const { width } = Dimensions.get('window');
 const HEADER_HEIGHT = 140;
+const FEED_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes - reduced for more dynamic updates
 
 // Quick action items
 const QUICK_ACTIONS = [
@@ -180,24 +191,82 @@ const HeroVideoSnippet = React.memo(function HeroVideoSnippet({
 
 export default function ProfileTab() {
   const { colors, isDark, getGradientArray } = useTheme();
-  const { user } = useUserStore();
+  const {
+    user,
+    likedCards,
+    bookmarkedCards,
+    toggleLikeCard,
+    toggleBookmarkCard,
+  } = useUserStore();
   const { plans } = usePlannerStore();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [feed, setFeed] = useState<FeedCardType[]>([]);
   const [stats, setStats] = useState<DailyStats | null>(null);
   const [contextMessage, setContextMessage] = useState('');
+  const [locationContext, setLocationContext] =
+    useState<LocationContext | null>(null);
+  const [selectedCard, setSelectedCard] = useState<FeedCardType | null>(null);
+  const [showCardModal, setShowCardModal] = useState(false);
   const router = useRouter();
   const scrollY = useSharedValue(0);
+  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastRefreshRef = useRef<number>(0);
 
   // Time context
   const timeContext = getTimeContext();
   const { greeting, timeOfDay, suggestedContext } = timeContext;
 
-  // Set contextual message on mount
+  // Get location context on mount
   useEffect(() => {
-    setContextMessage(getContextualMessage(timeOfDay));
+    const initLocationContext = async () => {
+      try {
+        const hasPermission = await getLocationPermission();
+        if (hasPermission) {
+          const context = await getLocationContext();
+          setLocationContext(context);
+
+          // Update contextual message with location
+          if (context.location && context.weather) {
+            const locationGreeting = getLocationGreeting(
+              context.location,
+              context.weather
+            );
+            setContextMessage(
+              context.suggestions[0] ||
+                `${context.weather.description} • ${context.weather.temperature}°C`
+            );
+          } else {
+            setContextMessage(getContextualMessage(timeOfDay));
+          }
+        } else {
+          setContextMessage(getContextualMessage(timeOfDay));
+        }
+      } catch (error) {
+        console.warn('Failed to get location context:', error);
+        setContextMessage(getContextualMessage(timeOfDay));
+      }
+    };
+
+    initLocationContext();
   }, [timeOfDay]);
+
+  // Auto-refresh feed periodically
+  useEffect(() => {
+    refreshTimerRef.current = setInterval(async () => {
+      const now = Date.now();
+      if (now - lastRefreshRef.current >= FEED_REFRESH_INTERVAL) {
+        console.log('🔄 Auto-refreshing feed...');
+        await loadFeed(true); // Silent refresh
+      }
+    }, 60000); // Check every minute
+
+    return () => {
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+      }
+    };
+  }, []);
 
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y;
@@ -256,31 +325,92 @@ export default function ProfileTab() {
     };
   });
 
-  // Load AI-powered feed
-  const loadFeed = useCallback(async () => {
-    try {
-      console.log('📱 Loading personalized home feed...');
-      const [feedData, statsData] = await Promise.all([
-        buildHomeFeed({
-          userName: user?.name || 'Friend',
-          plans: plans,
-        }),
-        getDailyStats(),
-      ]);
+  // Load AI-powered feed with location context
+  const loadFeed = useCallback(
+    async (silent = false) => {
+      try {
+        if (!silent) {
+          console.log('📱 Loading personalized home feed...');
+        }
 
-      setFeed(feedData);
-      setStats(statsData);
-      console.log(`✅ Loaded ${feedData.length} feed items`);
-    } catch (error) {
-      console.error('Failed to load feed:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.name, plans]);
+        const [feedData, statsData] = await Promise.all([
+          buildHomeFeed({
+            userName: user?.name || 'Friend',
+            plans: plans,
+            useLocation: true,
+          }),
+          getDailyStats(),
+        ]);
+
+        setFeed(feedData);
+        setStats(statsData);
+        lastRefreshRef.current = Date.now();
+
+        if (!silent) {
+          console.log(`✅ Loaded ${feedData.length} feed items`);
+        }
+      } catch (error) {
+        console.error('Failed to load feed:', error);
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [user?.name, plans]
+  );
 
   useEffect(() => {
     loadFeed();
   }, [loadFeed]);
+
+  // Refresh feed when tab comes into focus (activity-based refresh)
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now();
+      // Only refresh if more than 2 minutes since last refresh (avoids rapid refreshes)
+      if (now - lastRefreshRef.current >= 2 * 60 * 1000) {
+        console.log('🔄 Tab focused - refreshing feed...');
+        loadFeed(true); // Silent refresh on focus
+      }
+      return () => {
+        // Cleanup if needed
+      };
+    }, [loadFeed])
+  );
+
+  // Handle card tap - open full-screen modal for expandable cards
+  const handleCardTap = useCallback((card: FeedCardType) => {
+    if (card.isExpandable) {
+      haptics.medium();
+      setSelectedCard(card);
+      setShowCardModal(true);
+    } else if (card.externalUrl) {
+      // Open external URL
+      haptics.light();
+      // Would use Linking.openURL here
+    }
+  }, []);
+
+  // Handle like from modal
+  const handleModalLike = useCallback(
+    (liked: boolean) => {
+      if (selectedCard) {
+        toggleLikeCard(selectedCard.id);
+      }
+    },
+    [selectedCard, toggleLikeCard]
+  );
+
+  // Handle bookmark from modal
+  const handleModalBookmark = useCallback(
+    (bookmarked: boolean) => {
+      if (selectedCard) {
+        toggleBookmarkCard(selectedCard.id);
+      }
+    },
+    [selectedCard, toggleBookmarkCard]
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -326,6 +456,14 @@ export default function ProfileTab() {
 
   const nextTask = getNextTaskCard();
 
+  // Get weather icon from location context or time
+  const getDisplayWeatherIcon = () => {
+    if (locationContext?.weather?.icon) {
+      return locationContext.weather.icon;
+    }
+    return getWeatherIcon(timeOfDay);
+  };
+
   const renderHeader = () => (
     <>
       {/* Animated Header */}
@@ -336,6 +474,7 @@ export default function ProfileTab() {
               <Text style={[styles.greeting, { color: colors.text }]}>
                 {greeting}, {user?.name || 'Traveler'}
               </Text>
+              {/* Weather badge with location context */}
               <View
                 style={[
                   styles.weatherBadge,
@@ -343,15 +482,29 @@ export default function ProfileTab() {
                 ]}
               >
                 <Ionicons
-                  name={getWeatherIcon(timeOfDay) as any}
+                  name={getDisplayWeatherIcon() as any}
                   size={16}
                   color={colors.primary}
                 />
+                {locationContext?.weather && (
+                  <Text style={[styles.tempText, { color: colors.primary }]}>
+                    {locationContext.weather.temperature}°
+                  </Text>
+                )}
               </View>
             </View>
-            <Text style={[styles.subGreeting, { color: colors.primary }]}>
-              {contextMessage}
-            </Text>
+            <View style={styles.subGreetingRow}>
+              <Text style={[styles.subGreeting, { color: colors.primary }]}>
+                {contextMessage}
+              </Text>
+              {locationContext?.location?.city && (
+                <Text
+                  style={[styles.locationText, { color: colors.textMuted }]}
+                >
+                  📍 {locationContext.location.city}
+                </Text>
+              )}
+            </View>
           </Animated.View>
 
           <Pressable
@@ -623,16 +776,37 @@ export default function ProfileTab() {
           {renderHeader()}
           <View style={styles.feedContainer}>
             {feed.map((item, index) => (
-              <FeedCard
-                key={item.id}
-                card={item}
-                isContextRelevant={item.priority === 3}
-                index={index}
-              />
+              <Pressable key={item.id} onPress={() => handleCardTap(item)}>
+                <FeedCard
+                  card={item}
+                  isContextRelevant={item.priority === 3}
+                  index={index}
+                  isLiked={likedCards.includes(item.id)}
+                  isBookmarked={bookmarkedCards.includes(item.id)}
+                  onLike={(cardId) => toggleLikeCard(cardId)}
+                  onBookmark={(cardId) => toggleBookmarkCard(cardId)}
+                />
+              </Pressable>
             ))}
             {renderFooter()}
           </View>
         </Animated.ScrollView>
+
+        {/* Full-screen Card Detail Modal */}
+        <CardDetailModal
+          visible={showCardModal}
+          card={selectedCard}
+          onClose={() => {
+            setShowCardModal(false);
+            setSelectedCard(null);
+          }}
+          onLike={handleModalLike}
+          onBookmark={handleModalBookmark}
+          isLiked={selectedCard ? likedCards.includes(selectedCard.id) : false}
+          isBookmarked={
+            selectedCard ? bookmarkedCards.includes(selectedCard.id) : false
+          }
+        />
       </SafeAreaView>
     </View>
   );
@@ -669,17 +843,32 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
   },
   weatherBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  tempText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  subGreetingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
   },
   subGreeting: {
     fontSize: 13,
-    marginTop: 6,
     fontWeight: '600',
     letterSpacing: 0.3,
+    flex: 1,
+  },
+  locationText: {
+    fontSize: 12,
+    marginLeft: 8,
   },
   iconButton: {
     width: 44,

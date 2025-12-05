@@ -1,4 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
+/**
+ * AlterEgoScreen - Grok Ani-style Immersive AI Companion Experience
+ * Features:
+ * - Full-screen animated gradient background
+ * - Floating action menu (Streaks, Capture, Outfit, Speaker, Settings)
+ * - Central "Start talking" button
+ * - Grok-style suggestion chips
+ * - Minimal chat input bar with mic, video, and Chat button
+ */
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,12 +18,14 @@ import {
   FlatList,
   Dimensions,
   Pressable,
-  ScrollView,
+  TextInput,
   Alert,
-  KeyboardAvoidingView,
+  Modal,
+  TouchableWithoutFeedback,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Animated, {
@@ -23,6 +35,7 @@ import Animated, {
   withTiming,
   withSequence,
   withSpring,
+  withDelay,
   Easing,
   interpolate,
   Extrapolation,
@@ -30,9 +43,11 @@ import Animated, {
   FadeInDown,
   FadeOut,
   SlideInRight,
+  SlideInUp,
+  ZoomIn,
+  SharedValue,
 } from 'react-native-reanimated';
 
-import { ChatInputBar } from '../chat/ChatInputBar';
 import { ChatMessage, sendMessageToAI } from '../chat/ChatHelpers';
 import { AVATAR_PRESETS, SUGGESTION_CHIPS } from '@/constants/Avatars';
 import { useUserStore } from '@/stores/userStore';
@@ -40,72 +55,209 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useVoiceContext } from '@/contexts/VoiceContext';
 import haptics from '@/lib/haptics';
 import * as Speech from 'expo-speech';
+import AvatarController, { AvatarState } from '../live2d/AvatarController';
+import AvatarSelector from '../live2d/AvatarSelector';
+import { Live2DModel } from '../live2d/Live2DAvatar';
+import { useElevenLabs } from '@/lib/voice/elevenLabsService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-function VoiceWaveAnimation({ color = '#007AFF' }: { color?: string }) {
-  const wave1 = useSharedValue(0.3);
-  const wave2 = useSharedValue(0.5);
-  const wave3 = useSharedValue(0.4);
-  const wave4 = useSharedValue(0.6);
-  const wave5 = useSharedValue(0.7);
+// Floating action button configuration (Grok Ani style)
+const FLOATING_ACTIONS = [
+  {
+    id: 'streaks',
+    icon: 'flame',
+    label: 'Streaks',
+    badge: 4,
+    color: '#FF6B00',
+  },
+  { id: 'capture', icon: 'scan-outline', label: 'Capture', color: '#ffffff' },
+  {
+    id: 'outfit',
+    icon: 'shirt-outline',
+    label: 'Outfit',
+    badge: 1,
+    color: '#ffffff',
+  },
+  {
+    id: 'speaker',
+    icon: 'volume-high-outline',
+    label: 'Speaker',
+    color: '#ffffff',
+  },
+  {
+    id: 'settings',
+    icon: 'settings-outline',
+    label: 'Settings',
+    color: '#ffffff',
+  },
+];
 
+// Individual wave bar component to comply with React hooks rules
+function WaveBar({
+  value,
+  color,
+  index,
+  isActive,
+}: {
+  value: SharedValue<number>;
+  color: string;
+  index: number;
+  isActive: boolean;
+}) {
   useEffect(() => {
-    wave1.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 400, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.3, { duration: 400, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1
-    );
-    wave2.value = withRepeat(
-      withSequence(
-        withTiming(0.8, { duration: 350, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.5, { duration: 350, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1
-    );
-    wave3.value = withRepeat(
-      withSequence(
-        withTiming(0.9, { duration: 450, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.4, { duration: 450, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1
-    );
-    wave4.value = withRepeat(
-      withSequence(
-        withTiming(0.7, { duration: 380, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.6, { duration: 380, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1
-    );
-    wave5.value = withRepeat(
-      withSequence(
-        withTiming(0.85, { duration: 420, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.7, { duration: 420, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1
-    );
-  }, []);
+    if (isActive) {
+      value.value = withRepeat(
+        withSequence(
+          withDelay(
+            index * 100,
+            withTiming(1, {
+              duration: 300 + index * 50,
+              easing: Easing.inOut(Easing.ease),
+            })
+          ),
+          withTiming(0.3, {
+            duration: 300 + index * 50,
+            easing: Easing.inOut(Easing.ease),
+          })
+        ),
+        -1,
+        true
+      );
+    } else {
+      value.value = withSpring(0.3);
+    }
+  }, [isActive, index, value]);
 
-  const createBarStyle = (sharedValue: any) =>
-    useAnimatedStyle(() => ({
-      height: `${sharedValue.value * 100}%`,
-    }));
+  const animatedStyle = useAnimatedStyle(() => ({
+    height: interpolate(value.value, [0, 1], [12, 36], Extrapolation.CLAMP),
+  }));
+
+  return (
+    <Animated.View
+      style={[styles.waveBar, { backgroundColor: color }, animatedStyle]}
+    />
+  );
+}
+
+// Voice wave animation component
+function VoiceWaveAnimation({
+  isActive,
+  color = '#ffffff',
+}: {
+  isActive: boolean;
+  color?: string;
+}) {
+  const bar0 = useSharedValue(0.3);
+  const bar1 = useSharedValue(0.5);
+  const bar2 = useSharedValue(0.4);
+  const bar3 = useSharedValue(0.6);
+  const bar4 = useSharedValue(0.5);
 
   return (
     <View style={styles.waveContainer}>
-      <Animated.View style={[styles.waveBar, { backgroundColor: color }, createBarStyle(wave1)]} />
-      <Animated.View style={[styles.waveBar, { backgroundColor: color }, createBarStyle(wave2)]} />
-      <Animated.View style={[styles.waveBar, { backgroundColor: color }, createBarStyle(wave3)]} />
-      <Animated.View style={[styles.waveBar, { backgroundColor: color }, createBarStyle(wave4)]} />
-      <Animated.View style={[styles.waveBar, { backgroundColor: color }, createBarStyle(wave5)]} />
+      <WaveBar value={bar0} color={color} index={0} isActive={isActive} />
+      <WaveBar value={bar1} color={color} index={1} isActive={isActive} />
+      <WaveBar value={bar2} color={color} index={2} isActive={isActive} />
+      <WaveBar value={bar3} color={color} index={3} isActive={isActive} />
+      <WaveBar value={bar4} color={color} index={4} isActive={isActive} />
+    </View>
+  );
+}
+
+// Floating Action Menu Component
+function FloatingActionMenu({
+  isExpanded,
+  onToggle,
+  onAction,
+  isMuted,
+}: {
+  isExpanded: boolean;
+  onToggle: () => void;
+  onAction: (actionId: string) => void;
+  isMuted: boolean;
+}) {
+  const { colors, isDark } = useTheme();
+  const textColor = isDark ? '#ffffff' : colors.text;
+  const subtleTextColor = isDark ? 'rgba(255, 255, 255, 0.9)' : colors.textSecondary;
+  const glassBg = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(45, 42, 38, 0.08)';
+
+  return (
+    <View style={styles.floatingMenuContainer}>
+      {isExpanded ? (
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          style={styles.floatingMenuExpanded}
+        >
+          {FLOATING_ACTIONS.map((action, index) => (
+            <Animated.View
+              key={action.id}
+              entering={SlideInRight.delay(index * 50).duration(200)}
+            >
+              <Pressable
+                style={styles.floatingActionItem}
+                onPress={() => onAction(action.id)}
+              >
+                <Text style={[styles.floatingActionLabel, { color: subtleTextColor }]}>{action.label}</Text>
+                <View
+                  style={[
+                    styles.floatingActionButton,
+                    { backgroundColor: glassBg },
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      action.id === 'speaker' && isMuted
+                        ? 'volume-mute-outline'
+                        : (action.icon as any)
+                    }
+                    size={22}
+                    color={action.id === 'streaks' ? action.color : textColor}
+                  />
+                  {action.badge && (
+                    <View
+                      style={[
+                        styles.actionBadge,
+                        { backgroundColor: action.color },
+                      ]}
+                    >
+                      <Text style={styles.actionBadgeText}>{action.badge}</Text>
+                    </View>
+                  )}
+                </View>
+              </Pressable>
+            </Animated.View>
+          ))}
+          {/* Close button */}
+          <Pressable style={styles.floatingActionItem} onPress={onToggle}>
+            <Text style={[styles.floatingActionLabel, { color: subtleTextColor }]}>Close</Text>
+            <View
+              style={[
+                styles.floatingActionButton,
+                { backgroundColor: glassBg },
+              ]}
+            >
+              <Ionicons name="chevron-up" size={22} color={textColor} />
+            </View>
+          </Pressable>
+        </Animated.View>
+      ) : (
+        <Pressable
+          style={[
+            styles.menuToggleButton,
+            { backgroundColor: glassBg },
+          ]}
+          onPress={onToggle}
+        >
+          <Ionicons name="grid-outline" size={22} color={textColor} />
+        </Pressable>
+      )}
     </View>
   );
 }
 
 export function AlterEgoScreen() {
-  const { colors, isDark, getGradientArray } = useTheme();
+  const { colors, isDark } = useTheme();
   const { hapticEnabled } = useUserStore();
   const {
     isListening,
@@ -114,27 +266,34 @@ export function AlterEgoScreen() {
     startRecording,
     stopRecording,
     cancelRecording,
-  } =
-    useVoiceContext();
+  } = useVoiceContext();
+
+  // ElevenLabs TTS integration
+  const {
+    isSpeaking: isElevenLabsSpeaking,
+    speak: speakWithElevenLabs,
+    stop: stopElevenLabs,
+  } = useElevenLabs();
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentAvatarIndex, setCurrentAvatarIndex] = useState(0);
   const [isThinking, setIsThinking] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [inputText, setInputText] = useState('');
+  const [isMenuExpanded, setIsMenuExpanded] = useState(false);
   const [showAttachments, setShowAttachments] = useState(false);
+  const [showAvatarSelector, setShowAvatarSelector] = useState(false);
+  const [selectedLive2DModel, setSelectedLive2DModel] = useState<Live2DModel>('hiyori');
+  const [avatarState, setAvatarState] = useState<AvatarState>('idle');
   const flatListRef = useRef<FlatList>(null);
+  const inputRef = useRef<TextInput>(null);
 
   const currentAvatar = AVATAR_PRESETS[currentAvatarIndex];
 
-  // Orb Animations
-  const orbScale = useSharedValue(1);
-  const orbOpacity = useSharedValue(0.8);
-  const orbGlowRadius = useSharedValue(40);
-  const orbPosition = useSharedValue(0);
-
-  // State-based animation modifiers
-  const thinkingPulse = useSharedValue(1);
-  const listeningPulse = useSharedValue(1);
+  // Animated values for pulsing orb
+  const orbPulse = useSharedValue(1);
+  const orbGlow = useSharedValue(0.5);
 
   // Initialize with greeting
   useEffect(() => {
@@ -148,116 +307,30 @@ export function AlterEgoScreen() {
     ]);
   }, [currentAvatar.id]);
 
-  // Base breathing animation
+  // Breathing animation for the orb
   useEffect(() => {
-    orbScale.value = withRepeat(
+    orbPulse.value = withRepeat(
       withSequence(
-        withTiming(1.08, { duration: 2500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 2500, easing: Easing.inOut(Easing.ease) })
+        withTiming(1.1, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) })
       ),
       -1,
       true
     );
-    orbOpacity.value = withRepeat(
+    orbGlow.value = withRepeat(
       withSequence(
-        withTiming(1, { duration: 2500 }),
-        withTiming(0.85, { duration: 2500 })
-      ),
-      -1,
-      true
-    );
-    orbGlowRadius.value = withRepeat(
-      withSequence(
-        withTiming(50, { duration: 2500 }),
-        withTiming(35, { duration: 2500 })
+        withTiming(0.8, { duration: 2000 }),
+        withTiming(0.4, { duration: 2000 })
       ),
       -1,
       true
     );
   }, []);
 
-  // Thinking state animation
-  useEffect(() => {
-    if (isThinking) {
-      thinkingPulse.value = withRepeat(
-        withSequence(
-          withTiming(1.15, {
-            duration: 400,
-            easing: Easing.inOut(Easing.ease),
-          }),
-          withTiming(0.95, { duration: 400, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1,
-        true
-      );
-    } else {
-      thinkingPulse.value = withSpring(1);
-    }
-  }, [isThinking]);
-
-  // Listening state animation
-  useEffect(() => {
-    if (isListening) {
-      listeningPulse.value = withRepeat(
-        withSequence(
-          withTiming(1.3, { duration: 300 }),
-          withTiming(1, { duration: 300 })
-        ),
-        -1,
-        true
-      );
-    } else {
-      listeningPulse.value = withSpring(1);
-    }
-  }, [isListening]);
-
-  // Move orb when messages appear
-  useEffect(() => {
-    if (messages.length > 1) {
-      setShowMessages(true);
-      orbPosition.value = withSpring(1, { damping: 15, stiffness: 100 });
-    }
-  }, [messages.length]);
-
-  const animatedOrbStyle = useAnimatedStyle(() => {
-    const scale = orbScale.value * thinkingPulse.value;
-    const translateY = interpolate(
-      orbPosition.value,
-      [0, 1],
-      [0, -SCREEN_HEIGHT * 0.2],
-      Extrapolation.CLAMP
-    );
-    const size = interpolate(
-      orbPosition.value,
-      [0, 1],
-      [180, 90],
-      Extrapolation.CLAMP
-    );
-
-    return {
-      width: size,
-      height: size,
-      borderRadius: size / 2,
-      transform: [{ scale }, { translateY }],
-      opacity: orbOpacity.value,
-      shadowRadius: orbGlowRadius.value * listeningPulse.value,
-    };
-  });
-
-  const animatedContainerStyle = useAnimatedStyle(() => {
-    return {
-      transform: [
-        {
-          translateY: interpolate(
-            orbPosition.value,
-            [0, 1],
-            [0, -40],
-            Extrapolation.CLAMP
-          ),
-        },
-      ],
-    };
-  });
+  const orbAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: orbPulse.value }],
+    opacity: orbGlow.value,
+  }));
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -265,131 +338,160 @@ export function AlterEgoScreen() {
     }, 100);
   };
 
-  const handleSend = async (text: string) => {
-    if (!text.trim()) return;
+  const handleSend = useCallback(
+    async (text: string) => {
+      if (!text.trim()) return;
 
-    if (hapticEnabled) {
-      haptics.light();
-    }
+      if (hapticEnabled) haptics.light();
 
-    const userMsg: ChatMessage = {
-      _id: `user_${Date.now()}`,
-      text: text.trim(),
-      createdAt: new Date(),
-      user: { _id: 1, name: 'You' },
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
-    scrollToBottom();
-    setIsThinking(true);
-
-    try {
-      // Use avatar-specific system prompt
-      const response = await sendMessageToAI(text, {
-        systemPrompt: currentAvatar.systemPrompt,
-      });
-
-      if (hapticEnabled) {
-        haptics.success();
+      // Stop any ongoing speech
+      if (isElevenLabsSpeaking) {
+        await stopElevenLabs();
       }
 
-      // Override the AI name with current avatar
-      const avatarResponse: ChatMessage = {
-        ...response,
-        user: { _id: 2, name: currentAvatar.name },
+      const userMsg: ChatMessage = {
+        _id: `user_${Date.now()}`,
+        text: text.trim(),
+        createdAt: new Date(),
+        user: { _id: 1, name: 'You' },
       };
 
-      // Speak the response if not muted
-      if (!isMuted && avatarResponse.text) {
-        Speech.speak(avatarResponse.text, {
-          rate: 0.9,
-          pitch: 1.0,
-        });
-      }
-
-      setMessages((prev) => [...prev, avatarResponse]);
+      setMessages((prev) => [...prev, userMsg]);
+      setInputText('');
+      setShowMessages(true);
       scrollToBottom();
-    } catch (error) {
-      console.error('AlterEgo error:', error);
+      setIsThinking(true);
+      setAvatarState('thinking'); // Avatar shows thinking expression
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          _id: `error_${Date.now()}`,
-          text: "I felt that pause. Take your time, I'm here.",
-          createdAt: new Date(),
+      try {
+        const response = await sendMessageToAI(text, {
+          systemPrompt: currentAvatar.systemPrompt,
+        });
+
+        if (hapticEnabled) haptics.success();
+
+        const avatarResponse: ChatMessage = {
+          ...response,
           user: { _id: 2, name: currentAvatar.name },
-        },
-      ]);
+        };
 
-      if (hapticEnabled) {
-        haptics.warning();
-      }
-    } finally {
-      setIsThinking(false);
-    }
-  };
+        setMessages((prev) => [...prev, avatarResponse]);
+        scrollToBottom();
 
-  const handleVoiceToggle = async (recording: boolean) => {
-    if (recording) {
-      // Stop any ongoing speech
-      Speech.stop();
-      
-      // Start recording using shared context
-      const started = await startRecording();
-      if (!started && hapticEnabled) {
-        haptics.error();
+        // Use ElevenLabs TTS if available and not muted
+        if (!isMuted && avatarResponse.text) {
+          setAvatarState('speaking'); // Avatar shows speaking expression
+
+          const success = await speakWithElevenLabs(avatarResponse.text, {
+            onComplete: () => {
+              setAvatarState('idle'); // Return to idle when done
+            },
+            onError: (error) => {
+              console.error('ElevenLabs error, falling back to Speech:', error);
+              // Fallback to expo-speech
+              Speech.speak(avatarResponse.text!, { rate: 0.9, pitch: 1.0 });
+              setAvatarState('idle');
+            },
+          });
+
+          if (!success) {
+            // If ElevenLabs fails, use fallback
+            Speech.speak(avatarResponse.text, { rate: 0.9, pitch: 1.0 });
+            setAvatarState('idle');
+          }
+        } else {
+          setAvatarState('idle');
+        }
+      } catch (error) {
+        console.error('AlterEgo error:', error);
+        setMessages((prev) => [
+          ...prev,
+          {
+            _id: `error_${Date.now()}`,
+            text: "I felt that pause. Take your time, I'm here.",
+            createdAt: new Date(),
+            user: { _id: 2, name: currentAvatar.name },
+          },
+        ]);
+        if (hapticEnabled) haptics.warning();
+        setAvatarState('sad'); // Show empathetic expression
+        setTimeout(() => setAvatarState('idle'), 2000);
+      } finally {
+        setIsThinking(false);
       }
-    } else {
-      // Stop recording and get transcription from shared context
+    },
+    [currentAvatar, hapticEnabled, isMuted, isElevenLabsSpeaking, stopElevenLabs, speakWithElevenLabs]
+  );
+
+  const handleVoicePress = async () => {
+    if (hapticEnabled) haptics.selection();
+    Speech.stop();
+
+    if (isListening) {
+      setAvatarState('thinking'); // Show thinking while transcribing
       try {
         const text = await stopRecording();
-        if (text && text.trim()) {
+        if (text?.trim()) {
           handleSend(text);
-        } else if (text === '' && hapticEnabled) {
-          haptics.warning();
+        } else {
+          setAvatarState('idle');
         }
       } catch (error) {
         console.error('Voice error:', error);
-        if (hapticEnabled) {
-          haptics.error();
-        }
+        if (hapticEnabled) haptics.error();
+        setAvatarState('sad');
+        setTimeout(() => setAvatarState('idle'), 1500);
+      }
+    } else {
+      setAvatarState('listening'); // Show listening expression
+      const started = await startRecording();
+      if (!started) {
+        if (hapticEnabled) haptics.error();
+        setAvatarState('surprised'); // Show surprised on error
+        setTimeout(() => setAvatarState('idle'), 1500);
       }
     }
   };
 
-  const handleSuggestionPress = (suggestion: (typeof SUGGESTION_CHIPS)[0]) => {
-    if (hapticEnabled) {
-      haptics.selection();
-    }
-    handleSend(suggestion.text);
+  const handleSuggestionPress = (text: string) => {
+    if (hapticEnabled) haptics.selection();
+    handleSend(text);
   };
 
-  const handleMuteToggle = () => {
-    if (hapticEnabled) {
-      haptics.selection();
+  const handleFloatingAction = (actionId: string) => {
+    if (hapticEnabled) haptics.selection();
+
+    switch (actionId) {
+      case 'streaks':
+        Alert.alert('Streaks', 'You have a 4-day streak! Keep it going 🔥');
+        break;
+      case 'capture':
+        handleCapture();
+        break;
+      case 'outfit':
+        // Open avatar selector
+        setShowAvatarSelector(true);
+        break;
+      case 'speaker':
+        setIsMuted(!isMuted);
+        if (isMuted) {
+          Speech.stop();
+        }
+        break;
+      case 'settings':
+        Alert.alert('Settings', 'Character settings coming soon!');
+        break;
     }
-    setIsMuted(!isMuted);
+    setIsMenuExpanded(false);
   };
 
-  const handleCamera = async () => {
-    if (hapticEnabled) {
-      haptics.selection();
-    }
-
-    // Request camera permissions
+  const handleCapture = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    
     if (status !== 'granted') {
-      Alert.alert(
-        'Camera Permission',
-        'Camera access is required to take photos.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Permission needed', 'Camera access is required');
       return;
     }
 
-    // Launch camera
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -397,26 +499,17 @@ export function AlterEgoScreen() {
     });
 
     if (!result.canceled && result.assets?.[0]) {
-      // Handle image - could send to chat or store
-      console.log('Camera image:', result.assets[0].uri);
-      if (hapticEnabled) {
-        haptics.success();
-      }
+      if (hapticEnabled) haptics.success();
+      handleSend('[Shared a photo]');
     }
   };
 
-  const handleAttach = () => {
-    if (hapticEnabled) {
-      haptics.selection();
-    }
-    setShowAttachments(true);
-  };
-
-  const getStatusText = () => {
-    if (isThinking) return `${currentAvatar.name} is thinking...`;
-    if (isListening) return 'Listening...';
-    if (messages.length > 1) return `Chatting with ${currentAvatar.name}`;
-    return `${currentAvatar.emoji} ${currentAvatar.name}`;
+  const handleVideoCall = () => {
+    if (hapticEnabled) haptics.selection();
+    Alert.alert(
+      'Video Call',
+      'Video calls with your AI companion coming soon!'
+    );
   };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
@@ -427,234 +520,86 @@ export function AlterEgoScreen() {
         entering={FadeInDown.duration(300)}
         style={[styles.messageRow, isUser ? styles.userRow : styles.aiRow]}
       >
-        {isUser ? (
-          <View style={styles.userMessageContainer}>
-            <View
-              style={[
-                styles.userBubble,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(30, 30, 40, 0.6)'
-                    : 'rgba(0, 0, 0, 0.05)',
-                  borderColor: isDark
-                    ? 'rgba(255, 255, 255, 0.1)'
-                    : 'rgba(0, 0, 0, 0.1)',
-                },
-              ]}
-            >
-              <Text style={[styles.messageText, { color: colors.text }]}>
-                {item.text}
-              </Text>
-            </View>
-          </View>
-        ) : (
-          <View
-            style={[
-              styles.aiBubble,
-              {
-                backgroundColor: isDark ? 'rgba(30, 30, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)',
-                borderWidth: 1.5,
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
-              },
-            ]}
-          >
-            <Text style={[styles.messageText, { color: colors.text }]}>
-              {item.text}
-            </Text>
-          </View>
-        )}
+        <View
+          style={[
+            isUser ? styles.userBubble : styles.aiBubble,
+            {
+              backgroundColor: isUser
+                ? isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(45, 42, 38, 0.08)'
+                : isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(45, 42, 38, 0.06)',
+            },
+          ]}
+        >
+          <Text style={[styles.messageText, { color: isDark ? '#ffffff' : colors.text }]}>{item.text}</Text>
+        </View>
       </Animated.View>
     );
   };
 
-  const renderSuggestionChips = () => (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.suggestionsContainer}
-    >
-      {SUGGESTION_CHIPS.map((chip) => (
-        <Pressable
-          key={chip.id}
-          style={[
-            styles.suggestionChip,
-            { borderColor: `${currentAvatar.colors.primary}40` },
-          ]}
-          onPress={() => handleSuggestionPress(chip)}
-        >
-          <Ionicons
-            name={chip.icon as any}
-            size={14}
-            color={currentAvatar.colors.primary}
-          />
-          <Text style={styles.suggestionText}>{chip.text}</Text>
-        </Pressable>
-      ))}
-    </ScrollView>
-  );
+  const gradientColors = isDark 
+    ? ['#2D1F4A', '#4A3070', '#6B3D8A', '#3D2060', '#1A0F30'] as const
+    : [colors.gradients.chat.start, colors.gradients.chat.mid, colors.gradients.chat.end, colors.gradients.chat.mid, colors.gradients.chat.start] as const;
+
+  const textColor = isDark ? '#ffffff' : colors.text;
+  const subtleTextColor = isDark ? 'rgba(255, 255, 255, 0.9)' : colors.textSecondary;
+  const mutedTextColor = isDark ? 'rgba(255, 255, 255, 0.7)' : colors.textMuted;
+  const mutedTextColorLight = isDark ? 'rgba(255, 255, 255, 0.4)' : colors.inputPlaceholder;
+  const glassBg = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(45, 42, 38, 0.08)';
+  const glassBorder = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(45, 42, 38, 0.1)';
+  const glassBgLight = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(45, 42, 38, 0.05)';
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
+      {/* Full-screen gradient background */}
       <LinearGradient
-        colors={
-          isDark
-            ? [currentAvatar.colors.gradient[2], '#0D0D15', '#050508']
-            : [
-                currentAvatar.colors.gradient[0] + '40',
-                colors.background,
-                colors.surface,
-              ]
-        }
-        locations={[0, 0.4, 1]}
+        colors={gradientColors}
+        locations={[0, 0.25, 0.5, 0.75, 1]}
         style={StyleSheet.absoluteFill}
       />
 
-      <SafeAreaView
-        style={styles.content}
-        edges={['left', 'right']}
-        onTouchStart={() => Keyboard.dismiss()}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.avatarInfo}>
-            <Text style={[styles.avatarName, { color: colors.text }]}>
-              {currentAvatar.name}
-            </Text>
-            <Text
-              style={[styles.avatarPersonality, { color: colors.textMuted }]}
-            >
-              {currentAvatar.personality}
-            </Text>
-          </View>
-        </View>
+      {/* Animated background blobs */}
+      {isDark && (
+        <>
+          <Animated.View style={[styles.backgroundBlob1, orbAnimatedStyle]} />
+          <Animated.View style={[styles.backgroundBlob2, orbAnimatedStyle]} />
+        </>
+      )}
 
-        {/* Orb Container (no swipe) */}
-        <Animated.View style={[styles.orbSection, animatedContainerStyle]}>
-          <View style={styles.orbWrapper}>
-            {/* Outer glow rings */}
-            <View
-              style={[
-                styles.glowRing,
-                styles.glowRing1,
-                { borderColor: `${currentAvatar.colors.primary}20` },
-              ]}
-            />
-            <View
-              style={[
-                styles.glowRing,
-                styles.glowRing2,
-                { borderColor: `${currentAvatar.colors.primary}10` },
-              ]}
-            />
+      {/* Main content */}
+      <View style={styles.content}>
+        {/* Center area - Live2D Avatar or messages */}
+        <View style={styles.centerArea}>
+          {!showMessages ? (
+            <View style={styles.avatarContainer}>
+              {/* Live2D Avatar */}
+              <View style={styles.avatarWrapper}>
+                <AvatarController
+                  model={selectedLive2DModel}
+                  state={avatarState}
+                  isSpeaking={isElevenLabsSpeaking}
+                  onReady={() => console.log('Avatar ready')}
+                  onError={(error) => console.error('Avatar error:', error)}
+                  style={styles.avatar}
+                />
+              </View>
 
-            {/* Main orb with avatar gradient */}
-            <Animated.View
-              style={[
-                styles.orb,
-                animatedOrbStyle,
-                {
-                  backgroundColor: currentAvatar.colors.primary,
-                  shadowColor: currentAvatar.colors.glow,
-                },
-              ]}
-            >
-              <LinearGradient
-                colors={[...currentAvatar.colors.gradient]}
-                style={StyleSheet.absoluteFill}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
-            </Animated.View>
-          </View>
-
-          {/* Status Text */}
-          <Text style={[styles.statusText, { color: colors.textMuted }]}>
-            {getStatusText()}
-          </Text>
-
-          {/* Voice Wave Animation */}
-          {isListening && (
-            <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.voiceWaveWrapper}>
-              <VoiceWaveAnimation color={currentAvatar.colors.primary} />
-            </Animated.View>
-          )}
-
-          {/* Floating Action Buttons */}
-          <Animated.View
-            entering={SlideInRight.delay(200)}
-            style={styles.floatingActionButtons}
-          >
-            <Pressable
-              style={[
-                styles.floatingActionButton,
-                { 
-                  backgroundColor: colors.glassBackground,
-                  borderColor: 'rgba(255, 255, 255, 0.1)',
-                },
-              ]}
-              onPress={handleMuteToggle}
-            >
-              <Ionicons 
-                name={isMuted ? "volume-mute" : "volume-high"} 
-                size={20} 
-                color={colors.text} 
-              />
-            </Pressable>
-
-            {/* Camera button moved to ChatInputBar */}
-
-            <Pressable
-              style={[
-                styles.floatingActionButton,
-                { 
-                  backgroundColor: colors.glassBackground,
-                  borderColor: 'rgba(255, 255, 255, 0.1)',
-                },
-              ]}
-              onPress={handleAttach}
-            >
-              <Ionicons name="attach" size={20} color={colors.text} />
-            </Pressable>
-          </Animated.View>
-        </Animated.View>
-
-        {/* Suggestion Chips (shown before messages) */}
-        {!showMessages && messages.length <= 1 && (
-          <Animated.View entering={FadeIn.delay(500)}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.suggestionsContainer}
-            >
-              {SUGGESTION_CHIPS.map((chip) => (
+              {/* Start talking button overlay */}
+              <Animated.View
+                entering={ZoomIn.duration(400)}
+                style={styles.startTalkingContainer}
+              >
                 <Pressable
-                  key={chip.id}
-                  style={[
-                    styles.suggestionChip,
-                    {
-                      borderColor: `${currentAvatar.colors.primary}40`,
-                      backgroundColor: colors.glassBackground,
-                    },
-                  ]}
-                  onPress={() => handleSuggestionPress(chip)}
+                  style={[styles.startTalkingButton, { backgroundColor: glassBgLight, borderColor: glassBorder }]}
+                  onPress={handleVoicePress}
                 >
-                  <Ionicons
-                    name={chip.icon as any}
-                    size={14}
-                    color={currentAvatar.colors.primary}
-                  />
-                  <Text style={[styles.suggestionText, { color: colors.text }]}>
-                    {chip.text}
+                  <VoiceWaveAnimation isActive={isListening} color={textColor} />
+                  <Text style={[styles.startTalkingText, { color: textColor }]}>
+                    {isListening ? 'Listening...' : 'Start talking'}
                   </Text>
                 </Pressable>
-              ))}
-            </ScrollView>
-          </Animated.View>
-        )}
-
-        {/* Messages Area */}
-        {showMessages && (
-          <View style={styles.messagesContainer}>
+              </Animated.View>
+            </View>
+          ) : (
             <FlatList
               ref={flatListRef}
               data={messages}
@@ -664,29 +609,170 @@ export function AlterEgoScreen() {
               showsVerticalScrollIndicator={false}
               onContentSizeChange={scrollToBottom}
             />
-          </View>
-        )}
+          )}
+        </View>
 
-        {/* Input Area */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
-        >
-          <View style={styles.inputContainer}>
-            <ChatInputBar
-              onSend={handleSend}
-              onVoiceToggle={handleVoiceToggle}
-              isListening={isListening}
-              isLoading={isThinking}
-              isTranscribing={isTranscribing}
-              recordingDuration={duration}
-              onCancelRecording={cancelRecording}
-              showCamera={true}
-              onCameraPress={handleCamera}
-            />
+        {/* Floating Action Menu (Right side) */}
+        <FloatingActionMenu
+          isExpanded={isMenuExpanded}
+          onToggle={() => {
+            if (hapticEnabled) haptics.selection();
+            setIsMenuExpanded(!isMenuExpanded);
+          }}
+          onAction={handleFloatingAction}
+          isMuted={isMuted}
+        />
+
+        {/* Bottom section - Suggestions & Input */}
+        <View style={styles.bottomSection}>
+          {/* Suggestion chips (Grok Ani style) */}
+          {!showMessages && (
+            <Animated.View
+              entering={SlideInUp.delay(300).duration(400)}
+              style={styles.suggestionsRow}
+            >
+              {SUGGESTION_CHIPS.map((chip) => (
+                <Pressable
+                  key={chip.id}
+                  style={[styles.suggestionChip, { backgroundColor: glassBg, borderColor: glassBorder }]}
+                  onPress={() => handleSuggestionPress(chip.text)}
+                >
+                  <Text style={[styles.suggestionText, { color: subtleTextColor }]}>{chip.text}</Text>
+                </Pressable>
+              ))}
+            </Animated.View>
+          )}
+
+          {/* Input bar (Grok Ani style) */}
+          <View style={[styles.inputBar, { backgroundColor: glassBgLight, borderColor: glassBorder }]}>
+            {/* Mic button */}
+            <Pressable
+              style={[
+                styles.inputIconButton,
+                { backgroundColor: glassBgLight },
+                isListening && styles.inputIconButtonActive,
+              ]}
+              onPress={handleVoicePress}
+            >
+              <Ionicons
+                name={isListening ? 'mic' : 'mic-outline'}
+                size={22}
+                color={isListening ? colors.primary : mutedTextColor}
+              />
+            </Pressable>
+
+            {/* Video button */}
+            <Pressable style={[styles.inputIconButton, { backgroundColor: glassBgLight }]} onPress={handleVideoCall}>
+              <Ionicons
+                name="videocam-outline"
+                size={22}
+                color={mutedTextColor}
+              />
+            </Pressable>
+
+            {/* Text input */}
+            <View style={styles.textInputContainer}>
+              <TextInput
+                ref={inputRef}
+                style={[styles.textInput, { color: textColor }]}
+                placeholder="Ask Anything"
+                placeholderTextColor={mutedTextColorLight}
+                value={inputText}
+                onChangeText={setInputText}
+                onSubmitEditing={() => handleSend(inputText)}
+                returnKeyType="send"
+              />
+            </View>
+
+            {/* Chat/Send button */}
+            <Pressable
+              style={[
+                styles.chatButton,
+                { backgroundColor: isDark ? '#ffffff' : colors.primary },
+                inputText.trim() && { backgroundColor: colors.primary },
+              ]}
+              onPress={() =>
+                inputText.trim()
+                  ? handleSend(inputText)
+                  : inputRef.current?.focus()
+              }
+            >
+              <Ionicons
+                name={inputText.trim() ? 'send' : 'chatbubble-outline'}
+                size={18}
+                color={inputText.trim() ? '#ffffff' : (isDark ? '#000000' : '#ffffff')}
+              />
+              <Text style={[styles.chatButtonText, { color: inputText.trim() ? '#ffffff' : (isDark ? '#000000' : '#ffffff') }]}>
+                {inputText.trim() ? 'Send' : 'Chat'}
+              </Text>
+            </Pressable>
           </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+        </View>
+      </View>
+
+      {/* Attachment Modal */}
+      <Modal
+        visible={showAttachments}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAttachments(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowAttachments(false)}>
+          <View style={styles.modalOverlay}>
+            <BlurView intensity={60} tint="dark" style={styles.attachmentMenu}>
+              <Pressable
+                style={styles.attachmentOption}
+                onPress={handleCapture}
+              >
+                <View style={styles.attachmentIconBadge}>
+                  <Ionicons name="camera-outline" size={24} color="#ffffff" />
+                </View>
+                <Text style={styles.attachmentLabel}>Camera</Text>
+              </Pressable>
+              <Pressable
+                style={styles.attachmentOption}
+                onPress={async () => {
+                  setShowAttachments(false);
+                  const result = await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ['images'],
+                    quality: 0.8,
+                  });
+                  if (!result.canceled) {
+                    handleSend('[Shared a photo]');
+                  }
+                }}
+              >
+                <View style={styles.attachmentIconBadge}>
+                  <Ionicons name="images-outline" size={24} color="#ffffff" />
+                </View>
+                <Text style={styles.attachmentLabel}>Photos</Text>
+              </Pressable>
+              <Pressable
+                style={styles.attachmentOption}
+                onPress={() => setShowAttachments(false)}
+              >
+                <View style={styles.attachmentIconBadge}>
+                  <Ionicons name="document-outline" size={24} color="#ffffff" />
+                </View>
+                <Text style={styles.attachmentLabel}>Files</Text>
+              </Pressable>
+            </BlurView>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Avatar Selector Modal */}
+      <AvatarSelector
+        visible={showAvatarSelector}
+        currentAvatar={selectedLive2DModel}
+        onSelect={(avatar) => {
+          setSelectedLive2DModel(avatar);
+          setShowAvatarSelector(false);
+          setAvatarState('happy'); // Show happy expression on avatar change
+          setTimeout(() => setAvatarState('idle'), 2000);
+        }}
+        onClose={() => setShowAvatarSelector(false)}
+      />
     </View>
   );
 }
@@ -697,77 +783,101 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  // Background animated blobs
+  backgroundBlob1: {
+    position: 'absolute',
+    width: SCREEN_WIDTH * 0.8,
+    height: SCREEN_WIDTH * 0.8,
+    borderRadius: SCREEN_WIDTH * 0.4,
+    backgroundColor: 'rgba(139, 92, 246, 0.3)',
+    top: SCREEN_HEIGHT * 0.15,
+    left: -SCREEN_WIDTH * 0.2,
+    transform: [{ scale: 1.2 }],
+  },
+  backgroundBlob2: {
+    position: 'absolute',
+    width: SCREEN_WIDTH * 0.6,
+    height: SCREEN_WIDTH * 0.6,
+    borderRadius: SCREEN_WIDTH * 0.3,
+    backgroundColor: 'rgba(236, 72, 153, 0.2)',
+    top: SCREEN_HEIGHT * 0.4,
+    right: -SCREEN_WIDTH * 0.15,
+  },
+  // Center area
+  centerArea: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  avatarContainer: {
+    flex: 1,
+    position: 'relative',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 4,
   },
-  avatarInfo: {
+  avatarWrapper: {
+    position: 'absolute',
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.6,
+    top: '10%',
+    left: 0,
+    right: 0,
+  },
+  avatar: {
     flex: 1,
   },
-  avatarName: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  avatarPersonality: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  orbSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 40,
-    paddingBottom: 16,
-  },
-  orbWrapper: {
-    width: 180,
-    height: 180,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  glowRing: {
+  startTalkingContainer: {
     position: 'absolute',
-    borderRadius: 150,
+    bottom: SCREEN_HEIGHT * 0.15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startTalkingButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 30,
     borderWidth: 1,
   },
-  glowRing1: {
-    width: 240,
-    height: 240,
+  startTalkingText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
   },
-  glowRing2: {
-    width: 300,
-    height: 300,
-  },
-  orb: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    overflow: 'hidden',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 40,
-    elevation: 20,
-  },
-  statusText: {
-    marginTop: 24,
-    fontSize: 14,
-    letterSpacing: 1,
-    fontWeight: '500',
-  },
-  voiceWaveWrapper: {
-    marginTop: 24,
-    height: 60,
+  // Voice wave animation
+  waveContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
+    height: 40,
+    gap: 4,
   },
-  floatingActionButtons: {
+  waveBar: {
+    width: 4,
+    borderRadius: 2,
+    minHeight: 12,
+  },
+  // Floating action menu
+  floatingMenuContainer: {
     position: 'absolute',
-    right: 20,
-    bottom: 130,
+    right: 16,
+    top: SCREEN_HEIGHT * 0.15,
+  },
+  floatingMenuExpanded: {
     gap: 12,
+  },
+  floatingActionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  floatingActionLabel: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    fontWeight: '500',
   },
   floatingActionButton: {
     width: 44,
@@ -775,50 +885,102 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
   },
-  waveContainer: {
-    flexDirection: 'row',
+  actionBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
-    height: 60,
+    paddingHorizontal: 4,
   },
-  waveBar: {
-    width: 4,
-    borderRadius: 2,
-    minHeight: 12,
+  actionBadgeText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
-  suggestionsContainer: {
+  menuToggleButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Bottom section
+  bottomSection: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+  },
+  suggestionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 16,
   },
   suggestionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
     paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
-    marginRight: 8,
   },
   suggestionText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
   },
-  messagesContainer: {
-    flex: 1,
-    maxHeight: SCREEN_HEIGHT * 0.4,
+  // Input bar
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 28,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    borderWidth: 1,
   },
+  inputIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inputIconButtonActive: {
+    backgroundColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  textInputContainer: {
+    flex: 1,
+    marginHorizontal: 8,
+  },
+  textInput: {
+    fontSize: 16,
+    paddingVertical: 8,
+  },
+  chatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  chatButtonActive: {
+    backgroundColor: '#8B5CF6',
+  },
+  chatButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Messages
   messagesList: {
-    paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 20,
   },
   messageRow: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   userRow: {
     justifyContent: 'flex-end',
@@ -826,36 +988,56 @@ const styles = StyleSheet.create({
   aiRow: {
     justifyContent: 'flex-start',
   },
-  aiBubble: {
-    maxWidth: '80%',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderBottomLeftRadius: 6,
-  },
-  aiMessageText: {
-    fontSize: 16,
-    lineHeight: 24,
-    maxWidth: '90%',
-    paddingHorizontal: 20,
-  },
-  userMessageContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
   userBubble: {
     maxWidth: '80%',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderRadius: 24,
-    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderBottomRightRadius: 6,
+  },
+  aiBubble: {
+    maxWidth: '80%',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderBottomLeftRadius: 6,
   },
   messageText: {
+    color: '#ffffff',
     fontSize: 15,
     lineHeight: 22,
   },
-  inputContainer: {
-    marginTop: 'auto',
+  // Attachment modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  attachmentMenu: {
+    width: 240,
+    borderRadius: 20,
+    overflow: 'hidden',
+    paddingVertical: 16,
+  },
+  attachmentOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  attachmentIconBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  attachmentLabel: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });

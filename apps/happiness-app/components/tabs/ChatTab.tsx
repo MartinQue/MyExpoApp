@@ -98,95 +98,82 @@ export function ChatTab() {
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Header */}
+      {/* Header - Grok Style */}
       <SafeAreaView edges={['top']} style={styles.headerContainer}>
-        <BlurView
-          intensity={isDark ? 40 : 30}
-          tint={isDark ? 'dark' : 'light'}
-          style={styles.headerBlur}
-        >
-          <View
-            style={[
-              styles.headerContent,
-              { borderBottomColor: colors.glassBorder },
-            ]}
+        <View style={styles.headerContent}>
+          {/* Left: Menu Icon - Goes to Settings */}
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={handleMenuPress}
+            activeOpacity={0.7}
           >
-            {/* Left: Menu Icon - Goes to Settings */}
+            <Ionicons name="menu" size={26} color={colors.text} />
+          </TouchableOpacity>
+
+          {/* Center: Tab Names (Grok-style text tabs with underline) */}
+          <View style={styles.tabsContainer}>
             <TouchableOpacity
-              style={styles.iconButton}
-              onPress={handleMenuPress}
+              style={styles.tabButton}
+              onPress={() => handleTabPress(0)}
               activeOpacity={0.7}
             >
-              <Ionicons name="menu" size={24} color={colors.text} />
+              <Text
+                style={[
+                  styles.tabText,
+                  { color: activeTab === 0 ? colors.text : colors.textMuted },
+                ]}
+              >
+                Ask
+              </Text>
+              {activeTab === 0 && (
+                <View
+                  style={[
+                    styles.tabUnderline,
+                    { backgroundColor: colors.text },
+                  ]}
+                />
+              )}
             </TouchableOpacity>
 
-            {/* Center: Segmented Control */}
-            <View
-              style={[
-                styles.segmentedControl,
-                { backgroundColor: colors.glassBackground },
-              ]}
-            >
-              <TouchableOpacity
-                style={[
-                  styles.segment,
-                  activeTab === 0 && [
-                    styles.activeSegment,
-                    { backgroundColor: colors.surfaceElevated },
-                  ],
-                ]}
-                onPress={() => handleTabPress(0)}
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    styles.segmentText,
-                    { color: colors.textMuted },
-                    activeTab === 0 && [
-                      styles.activeSegmentText,
-                      { color: colors.text },
-                    ],
-                  ]}
-                >
-                  Ask
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.segment,
-                  activeTab === 1 && [
-                    styles.activeSegment,
-                    { backgroundColor: colors.surfaceElevated },
-                  ],
-                ]}
-                onPress={() => handleTabPress(1)}
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    styles.segmentText,
-                    { color: colors.textMuted },
-                    activeTab === 1 && [
-                      styles.activeSegmentText,
-                      { color: colors.text },
-                    ],
-                  ]}
-                >
-                  Alter Ego
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Right: New Chat Icon */}
             <TouchableOpacity
-              style={styles.iconButton}
-              onPress={handleNewChat}
+              style={styles.tabButton}
+              onPress={() => handleTabPress(1)}
               activeOpacity={0.7}
             >
-              <Ionicons name="create-outline" size={24} color={colors.text} />
+              <Text
+                style={[
+                  styles.tabText,
+                  { color: activeTab === 1 ? colors.text : colors.textMuted },
+                ]}
+              >
+                Alter Ego
+              </Text>
+              {activeTab === 1 && (
+                <View
+                  style={[
+                    styles.tabUnderline,
+                    { backgroundColor: colors.text },
+                  ]}
+                />
+              )}
             </TouchableOpacity>
           </View>
-        </BlurView>
+
+          {/* Right: Context-aware icon */}
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={activeTab === 0 ? handleNewChat : handleMenuPress}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={
+                activeTab === 0 ? 'chatbubble-ellipses-outline' : 'grid-outline'
+              }
+              size={24}
+              color={colors.text}
+            />
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
 
       {/* Content */}
@@ -215,49 +202,41 @@ const styles = StyleSheet.create({
   headerContainer: {
     zIndex: 10,
   },
-  headerBlur: {
-    overflow: 'hidden',
-  },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    paddingTop: 8,
-    height: 64,
-    borderBottomWidth: 0.5,
+    paddingBottom: 8,
+    paddingTop: 12,
+    height: 56,
   },
   iconButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  segmentedControl: {
+  // Grok-style tab navigation
+  tabsContainer: {
     flexDirection: 'row',
-    borderRadius: 20,
-    padding: 3,
-    height: 38,
-    width: 180,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  segment: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 17,
+    gap: 24,
   },
-  activeSegment: {
-    // backgroundColor set dynamically
+  tabButton: {
+    alignItems: 'center',
+    paddingVertical: 8,
   },
-  segmentText: {
-    fontSize: 14,
+  tabText: {
+    fontSize: 17,
     fontWeight: '600',
+    letterSpacing: 0.3,
   },
-  activeSegmentText: {
-    // color set dynamically
+  tabUnderline: {
+    height: 2,
+    width: '100%',
+    marginTop: 4,
+    borderRadius: 1,
   },
   pagerView: {
     flex: 1,

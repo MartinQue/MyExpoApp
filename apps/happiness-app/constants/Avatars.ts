@@ -210,7 +210,30 @@ export interface SuggestionChip {
   category: 'mood' | 'action' | 'topic' | 'social';
 }
 
+// Grok Ani-style suggestion chips
 export const SUGGESTION_CHIPS: SuggestionChip[] = [
+  {
+    id: 'surprise',
+    text: 'Surprise Me',
+    icon: 'sparkles-outline',
+    category: 'action',
+  },
+  {
+    id: 'teach',
+    text: 'Teach Me',
+    icon: 'school-outline',
+    category: 'action',
+  },
+  {
+    id: 'adventure',
+    text: 'Adventure Time',
+    icon: 'rocket-outline',
+    category: 'action',
+  },
+];
+
+// Extended suggestion chips for other contexts
+export const EXTENDED_SUGGESTION_CHIPS: SuggestionChip[] = [
   {
     id: 'feeling',
     text: "How I'm feeling",

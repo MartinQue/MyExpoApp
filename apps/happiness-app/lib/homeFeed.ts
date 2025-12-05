@@ -1,9 +1,16 @@
 // lib/homeFeed.ts
 // Enhanced Home Feed Service - Rich cards with images, videos, and deep reflection
+// Now with GPS location context, real-time weather, and highly personalized AI suggestions
 
 import { OPENAI_API_KEY } from '../constants/Config';
 import { supabase } from './supabase';
 import { Plan } from '@/stores/plannerStore';
+import {
+  getLocationContext,
+  UserLocation,
+  WeatherContext,
+  LocationContext,
+} from './locationService';
 
 // Placeholder images from Unsplash for different card types
 const PLACEHOLDER_IMAGES = {
@@ -103,7 +110,10 @@ export interface FeedCard {
     | 'wellness'
     | 'finance'
     | 'fitness'
-    | 'reflection';
+    | 'reflection'
+    | 'weather'
+    | 'location'
+    | 'personalized';
   title?: string;
   content: string;
   image?: string;
@@ -115,6 +125,11 @@ export interface FeedCard {
   details?: FeedCardDetails;
   isExpandable?: boolean;
   isSensitive?: boolean;
+  // New fields for enhanced cards
+  externalUrl?: string;
+  location?: string;
+  weatherIcon?: string;
+  accentColor?: string;
 }
 
 export interface DailyStats {
@@ -692,19 +707,278 @@ export function getNextTaskCard(plans: Plan[]): FeedCard | null {
 }
 
 /**
- * Build the complete enhanced home feed
+ * Generate a weather-based card for the current location
+ */
+export function generateWeatherCard(
+  location: UserLocation | null,
+  weather: WeatherContext | null
+): FeedCard | null {
+  if (!weather) return null;
+
+  const weatherImages: Record<string, string> = {
+    sunny: 'https://images.unsplash.com/photo-1601297183305-6df142704ea2?w=800',
+    cloudy:
+      'https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=800',
+    rainy: 'https://images.unsplash.com/photo-1534274988757-a28bf1a57c17?w=800',
+    snowy: 'https://images.unsplash.com/photo-1491002052546-bf38f186af56?w=800',
+    stormy:
+      'https://images.unsplash.com/photo-1605727216801-e27ce1d0cc28?w=800',
+    foggy: 'https://images.unsplash.com/photo-1487621167305-5d248087c724?w=800',
+    clear: 'https://images.unsplash.com/photo-1532978379173-523e16f371f2?w=800',
+  };
+
+  const weatherTips: Record<string, string[]> = {
+    sunny: [
+      'Perfect day for outdoor activities! ☀️',
+      "Don't forget sunscreen if going out",
+      'Great weather for a walk or run',
+    ],
+    cloudy: [
+      'Mild weather - great for focused work',
+      'Good day for errands without the heat',
+      'Comfortable conditions for outdoor exercise',
+    ],
+    rainy: [
+      'Perfect day for indoor productivity 🌧️',
+      'Cozy up with a good book or project',
+      'Great weather for reflection and planning',
+    ],
+    snowy: [
+      'Bundle up if going outside! ❄️',
+      'Perfect for hot drinks and warm meals',
+      'Take it slow on the roads',
+    ],
+    stormy: [
+      'Stay safe indoors today ⛈️',
+      'Good time for indoor activities',
+      'Check on loved ones',
+    ],
+    foggy: [
+      'Take extra care when driving 🌫️',
+      'Atmospheric day for creative work',
+      'Visibility may be limited',
+    ],
+    clear: [
+      'Beautiful clear skies today! ✨',
+      'Perfect conditions for stargazing tonight',
+      'Enjoy the visibility',
+    ],
+  };
+
+  const tips = weatherTips[weather.condition] || weatherTips.sunny;
+  const tip = tips[Math.floor(Math.random() * tips.length)];
+
+  return {
+    id: `weather_${Date.now()}`,
+    type: 'weather',
+    title: `${weather.temperature}°C in ${location?.city || 'Your Area'}`,
+    content: `${weather.description}. ${tip}`,
+    image: weatherImages[weather.condition] || weatherImages.sunny,
+    time: 'Updated just now',
+    icon: weather.icon,
+    agent: 'local',
+    priority: 2,
+    isExpandable: false,
+    location: location?.city || undefined,
+    weatherIcon: weather.icon,
+    accentColor:
+      weather.condition === 'sunny'
+        ? '#F59E0B'
+        : weather.condition === 'rainy'
+        ? '#3B82F6'
+        : weather.condition === 'snowy'
+        ? '#E0F2FE'
+        : '#6B7280',
+  };
+}
+
+/**
+ * Generate a location-based suggestion card
+ */
+export function generateLocationSuggestionCard(
+  locationContext: LocationContext,
+  userName: string
+): FeedCard | null {
+  if (
+    !locationContext.suggestions ||
+    locationContext.suggestions.length === 0
+  ) {
+    return null;
+  }
+
+  const suggestion = locationContext.suggestions[0];
+
+  return {
+    id: `location_${Date.now()}`,
+    type: 'location',
+    title: 'Local Suggestion',
+    content: suggestion,
+    time: 'Based on your location',
+    icon: 'location-outline',
+    agent: 'local',
+    priority: 2,
+    isExpandable: false,
+    location: locationContext.location?.city || undefined,
+  };
+}
+
+/**
+ * Generate a personalized AI card based on all context (location, mood, goals, time)
+ */
+export async function generatePersonalizedContextCard(params: {
+  userName: string;
+  plans: Plan[];
+  locationContext: LocationContext;
+  timeOfDay: string;
+}): Promise<FeedCard> {
+  const { userName, plans, locationContext, timeOfDay } = params;
+
+  // Default card if no API key
+  if (!OPENAI_API_KEY) {
+    return {
+      id: `personalized_${Date.now()}`,
+      type: 'personalized',
+      title: `Good ${timeOfDay}, ${userName}!`,
+      content: locationContext.weather
+        ? `It's ${
+            locationContext.weather.temperature
+          }°C and ${locationContext.weather.description.toLowerCase()}. ${
+            locationContext.suggestions[0] || 'Make the most of your day!'
+          }`
+        : 'Ready to make progress on your goals today?',
+      time: 'Just for you',
+      icon: 'sparkles',
+      agent: 'alter_ego',
+      priority: 3,
+      isExpandable: false,
+    };
+  }
+
+  try {
+    const contextInfo = {
+      time: timeOfDay,
+      location: locationContext.location?.city || 'unknown',
+      weather: locationContext.weather
+        ? {
+            temp: locationContext.weather.temperature,
+            condition: locationContext.weather.condition,
+          }
+        : null,
+      goals: plans.slice(0, 3).map((p) => ({
+        title: p.title,
+        progress: p.progress,
+        nextTask: p.nextTask,
+      })),
+    };
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        temperature: 0.8,
+        max_tokens: 150,
+        messages: [
+          {
+            role: 'system',
+            content: `You are a supportive AI companion. Generate a brief, personalized message (2-3 sentences) for ${userName} based on their current context. Be warm, practical, and specific. Consider their location, weather, time of day, and goals. Return JSON: { "title": "...", "content": "..." }`,
+          },
+          {
+            role: 'user',
+            content: JSON.stringify(contextInfo),
+          },
+        ],
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      try {
+        const parsed = JSON.parse(data.choices[0]?.message?.content || '{}');
+        return {
+          id: `personalized_${Date.now()}`,
+          type: 'personalized',
+          title: parsed.title || `Good ${timeOfDay}!`,
+          content: parsed.content || 'Ready to make progress today?',
+          time: 'Just for you',
+          icon: 'sparkles',
+          agent: 'alter_ego',
+          priority: 3,
+          isExpandable: false,
+        };
+      } catch {
+        // Fall through to default
+      }
+    }
+  } catch (error) {
+    console.error('Failed to generate personalized card:', error);
+  }
+
+  return {
+    id: `personalized_${Date.now()}`,
+    type: 'personalized',
+    title: `Good ${timeOfDay}, ${userName}!`,
+    content: 'Ready to make progress on your goals today?',
+    time: 'Just for you',
+    icon: 'sparkles',
+    agent: 'alter_ego',
+    priority: 3,
+    isExpandable: false,
+  };
+}
+
+/**
+ * Build the complete enhanced home feed with location context
  */
 export async function buildHomeFeed(params: {
   userName: string;
   plans: Plan[];
   userId?: string;
+  useLocation?: boolean;
 }): Promise<FeedCard[]> {
-  const { userName, plans } = params;
+  const { userName, plans, useLocation = true } = params;
   const { timeOfDay } = getTimeContext();
 
   const feed: FeedCard[] = [];
 
-  // 1. Deep reflection card (highest priority - self-reflection)
+  // Get location context if enabled
+  let locationContext: LocationContext | null = null;
+  if (useLocation) {
+    try {
+      console.log('📍 Getting location context for feed...');
+      locationContext = await getLocationContext();
+      console.log('📍 Location context:', locationContext.location?.city);
+    } catch (error) {
+      console.warn('Failed to get location context:', error);
+    }
+  }
+
+  // 1. Weather card (if location available) - high priority
+  if (locationContext?.weather) {
+    const weatherCard = generateWeatherCard(
+      locationContext.location,
+      locationContext.weather
+    );
+    if (weatherCard) {
+      feed.push(weatherCard);
+    }
+  }
+
+  // 2. Personalized context card (combines location, weather, goals, time)
+  if (locationContext) {
+    const personalizedCard = await generatePersonalizedContextCard({
+      userName,
+      plans,
+      locationContext,
+      timeOfDay,
+    });
+    feed.push(personalizedCard);
+  }
+
+  // 3. Deep reflection card (highest priority - self-reflection)
   const reflection = await generateDeepReflectionCard({
     userName,
     plans,
@@ -712,22 +986,26 @@ export async function buildHomeFeed(params: {
   });
   feed.push(reflection);
 
-  // 2. Financial insights card (if relevant)
+  // 4. Financial insights card (if relevant)
   const financeCard = generateFinanceCard();
   feed.push(financeCard);
 
-  // 3. Fitness motivation card (if user has fitness goals)
+  // 5. Fitness motivation card (if user has fitness goals)
   const fitnessCard = generateFitnessCard(plans);
   feed.push(fitnessCard);
 
-  // 4. Personalized quote
+  // 6. Personalized quote
   const quote = await generatePersonalizedQuote({
     userName,
+    mood:
+      locationContext?.weather?.condition === 'rainy'
+        ? 'reflective'
+        : undefined,
     recentActivity: plans[0]?.nextTask,
   });
   feed.push(quote);
 
-  // 5. Daily insight
+  // 7. Daily insight
   const insight = await generateDailyInsight({
     userName,
     plans,
@@ -735,10 +1013,21 @@ export async function buildHomeFeed(params: {
   });
   feed.push(insight);
 
-  // 6. Wellness check-in
+  // 8. Wellness check-in
   feed.push(generateWellnessCard(timeOfDay));
 
-  // 7. Task cards for active plans
+  // 9. Location-based suggestion
+  if (locationContext) {
+    const locationCard = generateLocationSuggestionCard(
+      locationContext,
+      userName
+    );
+    if (locationCard) {
+      feed.push(locationCard);
+    }
+  }
+
+  // 10. Task cards for active plans
   plans.slice(0, 2).forEach((plan) => {
     feed.push({
       id: `plan_${plan.id}`,
@@ -753,8 +1042,44 @@ export async function buildHomeFeed(params: {
     });
   });
 
-  // Sort by priority
+  // Sort by priority (highest first)
   return feed.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+}
+
+/**
+ * Refresh specific cards based on context changes
+ */
+export async function refreshContextCards(params: {
+  userName: string;
+  plans: Plan[];
+}): Promise<FeedCard[]> {
+  const { userName, plans } = params;
+  const { timeOfDay } = getTimeContext();
+
+  // Get fresh location context
+  const locationContext = await getLocationContext();
+
+  const cards: FeedCard[] = [];
+
+  // Weather card
+  if (locationContext?.weather) {
+    const weatherCard = generateWeatherCard(
+      locationContext.location,
+      locationContext.weather
+    );
+    if (weatherCard) cards.push(weatherCard);
+  }
+
+  // Personalized context card
+  const personalizedCard = await generatePersonalizedContextCard({
+    userName,
+    plans,
+    locationContext,
+    timeOfDay,
+  });
+  cards.push(personalizedCard);
+
+  return cards;
 }
 
 /**

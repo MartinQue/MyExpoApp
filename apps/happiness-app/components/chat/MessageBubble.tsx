@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { colors as GrokColors } from '../../constants/GrokColors';
 import { GrokLayout } from '../../constants/GrokLayout';
 import { GrokTypography } from '../../constants/GrokTypography';
+import { useTheme } from '@/contexts/ThemeContext';
 import haptics from '@/lib/haptics';
 
 interface MessageBubbleProps {
@@ -13,6 +15,7 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ role, content }: MessageBubbleProps) {
   const isUser = role === 'user';
+  const { isDark } = useTheme();
 
   return (
     <View
@@ -21,14 +24,27 @@ export function MessageBubble({ role, content }: MessageBubbleProps) {
         isUser ? styles.userContainer : styles.assistantContainer,
       ]}
     >
-      <View
+      <BlurView
+        intensity={60}
+        tint={isDark ? 'dark' : 'light'}
         style={[
           styles.bubble,
           isUser ? styles.userBubble : styles.assistantBubble,
         ]}
       >
-        <Text style={styles.text}>{content}</Text>
-      </View>
+        <View
+          style={[
+            styles.bubbleInner,
+            {
+              backgroundColor: isUser
+                ? 'rgba(139, 92, 246, 0.2)' // Purple tint for user
+                : 'rgba(255, 255, 255, 0.05)', // Subtle white for assistant
+            },
+          ]}
+        >
+          <Text style={styles.text}>{content}</Text>
+        </View>
+      </BlurView>
 
       {!isUser && (
         <View style={styles.actions}>
@@ -65,25 +81,23 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   bubble: {
-    padding: GrokLayout.messageBubble.padding,
     borderRadius: GrokLayout.messageBubble.borderRadius,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   userBubble: {
-    backgroundColor: GrokColors.userBubble,
     borderBottomRightRadius: 4,
   },
   assistantBubble: {
-    backgroundColor: GrokColors.assistantBubble,
     borderBottomLeftRadius: 4,
-    // Remove border/background if transparent desired,
-    // but Grok uses card color
+  },
+  bubbleInner: {
+    padding: GrokLayout.messageBubble.padding,
   },
   text: {
     color: GrokColors.primary,
     fontSize: GrokTypography.fontSizes.base,
-    // FIX: React Native lineHeight is pixels, not a multiplier.
-    // Multiplier 1.5 -> 1.5px height -> Glitch.
-    // Calculation: 16 * 1.5 = 24px
     lineHeight:
       GrokTypography.fontSizes.base * GrokTypography.lineHeights.normal,
   },

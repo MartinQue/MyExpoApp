@@ -9,7 +9,7 @@ interface GlassCardProps {
   intensity?: number;
 }
 
-export function GlassCard({ children, style, intensity = 40 }: GlassCardProps) {
+export function GlassCard({ children, style, intensity = 60 }: GlassCardProps) {
   return (
     <GlassView intensity={intensity} style={[styles.card, style]}>
       {children}

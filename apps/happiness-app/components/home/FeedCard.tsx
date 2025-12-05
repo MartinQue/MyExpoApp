@@ -9,6 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { MotiView, AnimatePresence } from 'moti';
 import { Video, ResizeMode } from 'expo-av';
@@ -18,22 +19,47 @@ import { useTheme } from '@/contexts/ThemeContext';
 import type { FeedCard as FeedCardType } from '@/lib/homeFeed';
 
 const { width } = Dimensions.get('window');
+const CARD_IMAGE_HEIGHT = 200;
 
 interface FeedCardProps {
   card: FeedCardType;
   isContextRelevant?: boolean;
   index?: number;
+  isLiked?: boolean;
+  isBookmarked?: boolean;
+  onLike?: (cardId: string, liked: boolean) => void;
+  onBookmark?: (cardId: string, bookmarked: boolean) => void;
 }
 
 export function FeedCard({
   card,
   isContextRelevant = false,
   index = 0,
+  isLiked: initialLiked = false,
+  isBookmarked: initialBookmarked = false,
+  onLike,
+  onBookmark,
 }: FeedCardProps) {
   const { colors, isDark } = useTheme();
   const [expanded, setExpanded] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [liked, setLiked] = useState(initialLiked);
+  const [bookmarked, setBookmarked] = useState(initialBookmarked);
   const videoRef = useRef<Video>(null);
+
+  const handleLike = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const newLiked = !liked;
+    setLiked(newLiked);
+    onLike?.(card.id, newLiked);
+  };
+
+  const handleBookmark = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const newBookmarked = !bookmarked;
+    setBookmarked(newBookmarked);
+    onBookmark?.(card.id, newBookmarked);
+  };
 
   const toggleExpand = () => {
     if (!card.isExpandable) return;
@@ -346,8 +372,58 @@ export function FeedCard({
         return { borderColor: 'rgba(244, 114, 182, 0.3)' };
       case 'quote':
         return { borderColor: 'rgba(59, 130, 246, 0.3)' };
+      case 'weather':
+        return { borderColor: 'rgba(245, 158, 11, 0.3)' };
+      case 'location':
+        return { borderColor: 'rgba(96, 165, 250, 0.3)' };
+      case 'personalized':
+        return { borderColor: 'rgba(168, 85, 247, 0.3)' };
       default:
         return {};
+    }
+  };
+
+  // Get gradient overlay for image based on card type
+  const getImageGradient = (): [string, string] => {
+    switch (card.type) {
+      case 'finance':
+        return ['transparent', 'rgba(16, 185, 129, 0.6)'];
+      case 'fitness':
+        return ['transparent', 'rgba(239, 68, 68, 0.6)'];
+      case 'reflection':
+        return ['transparent', 'rgba(139, 92, 246, 0.7)'];
+      case 'wellness':
+        return ['transparent', 'rgba(244, 114, 182, 0.6)'];
+      case 'quote':
+        return ['transparent', 'rgba(59, 130, 246, 0.6)'];
+      case 'weather':
+        return ['transparent', 'rgba(245, 158, 11, 0.5)'];
+      default:
+        return ['transparent', 'rgba(0, 0, 0, 0.7)'];
+    }
+  };
+
+  // Get accent color for card type
+  const getAccentColor = (): string => {
+    switch (card.type) {
+      case 'finance':
+        return '#10B981';
+      case 'fitness':
+        return '#EF4444';
+      case 'reflection':
+        return '#8B5CF6';
+      case 'wellness':
+        return '#F472B6';
+      case 'quote':
+        return '#3B82F6';
+      case 'weather':
+        return '#F59E0B';
+      case 'location':
+        return '#60A5FA';
+      case 'personalized':
+        return '#A855F7';
+      default:
+        return colors.primary;
     }
   };
 
@@ -368,10 +444,18 @@ export function FeedCard({
         return 'checkbox';
       case 'insight':
         return 'bulb';
+      case 'weather':
+        return card.weatherIcon || 'sunny';
+      case 'location':
+        return 'location';
+      case 'personalized':
+        return 'sparkles';
       default:
         return 'sparkles';
     }
   };
+
+  const accentColor = getAccentColor();
 
   return (
     <MotiView
@@ -402,7 +486,7 @@ export function FeedCard({
             getCardStyle(),
           ]}
         >
-          {/* Hero Image (collapsed state) */}
+          {/* Hero Image (collapsed state) - Enhanced Grok style */}
           {card.image && !expanded && (
             <View style={styles.imageContainer}>
               <Image
@@ -421,44 +505,77 @@ export function FeedCard({
                   <Ionicons name="image" size={24} color={colors.textMuted} />
                 </View>
               )}
-              <View style={styles.imageOverlay} />
+              {/* Gradient overlay matching card type */}
+              <LinearGradient
+                colors={getImageGradient()}
+                style={styles.imageGradient}
+              />
+              {/* Card type badge on image */}
+              <View
+                style={[styles.imageBadge, { backgroundColor: accentColor }]}
+              >
+                <Ionicons name={getTypeIcon() as any} size={12} color="white" />
+                <Text style={styles.imageBadgeText}>
+                  {card.agent?.toUpperCase() || card.type.toUpperCase()}
+                </Text>
+              </View>
+              {/* Location indicator if available */}
+              {card.location && (
+                <View style={styles.locationBadge}>
+                  <Ionicons name="location" size={10} color="white" />
+                  <Text style={styles.locationBadgeText}>{card.location}</Text>
+                </View>
+              )}
             </View>
           )}
 
           <View style={styles.content}>
-            {/* Header */}
-            <View style={styles.header}>
-              <View
-                style={[
-                  styles.sourceTag,
-                  { backgroundColor: colors.glassBackground },
-                  isContextRelevant && [
-                    styles.highlightedSourceTag,
-                    { backgroundColor: colors.primary },
-                  ],
-                ]}
-              >
-                <Ionicons
-                  name={getTypeIcon() as any}
-                  size={12}
-                  color={
-                    isContextRelevant ? colors.textInverse : colors.primary
-                  }
-                />
-                <Text
+            {/* Header - Only show if no image (badge is on image otherwise) */}
+            {!card.image && (
+              <View style={styles.header}>
+                <View
                   style={[
-                    styles.sourceText,
-                    { color: colors.primary },
-                    isContextRelevant && { color: colors.textInverse },
+                    styles.sourceTag,
+                    { backgroundColor: `${accentColor}20` },
+                    isContextRelevant && [
+                      styles.highlightedSourceTag,
+                      { backgroundColor: accentColor },
+                    ],
                   ]}
                 >
-                  {card.agent?.toUpperCase() || card.type.toUpperCase()}
+                  <Ionicons
+                    name={getTypeIcon() as any}
+                    size={12}
+                    color={isContextRelevant ? 'white' : accentColor}
+                  />
+                  <Text
+                    style={[
+                      styles.sourceText,
+                      { color: accentColor },
+                      isContextRelevant && { color: 'white' },
+                    ]}
+                  >
+                    {card.agent?.toUpperCase() || card.type.toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={[styles.timeText, { color: colors.textMuted }]}>
+                  {card.time}
                 </Text>
               </View>
-              <Text style={[styles.timeText, { color: colors.textMuted }]}>
+            )}
+
+            {/* Image cards show time below */}
+            {card.image && (
+              <Text
+                style={[
+                  styles.timeText,
+                  styles.timeTextBelow,
+                  { color: colors.textMuted },
+                ]}
+              >
                 {card.time}
               </Text>
-            </View>
+            )}
 
             {/* Title */}
             {card.title && card.type !== 'quote' && (
@@ -492,40 +609,41 @@ export function FeedCard({
               {expanded && card.type === 'wellness' && renderWellnessDetails()}
             </AnimatePresence>
 
-            {/* Footer */}
+            {/* Footer - Enhanced with accent color */}
             <View
               style={[styles.footer, { borderTopColor: colors.glassBorder }]}
             >
-              <Pressable
-                style={styles.actionButton}
-                onPress={() => Haptics.selectionAsync()}
-              >
+              <Pressable style={styles.actionButton} onPress={handleLike}>
                 <Ionicons
-                  name="heart-outline"
-                  size={18}
-                  color={colors.textMuted}
+                  name={liked ? 'heart' : 'heart-outline'}
+                  size={20}
+                  color={liked ? '#FF4757' : colors.textMuted}
                 />
+                {liked && <Text style={styles.actionLabel}>Liked</Text>}
               </Pressable>
-              <Pressable
-                style={styles.actionButton}
-                onPress={() => Haptics.selectionAsync()}
-              >
+              <Pressable style={styles.actionButton} onPress={handleBookmark}>
                 <Ionicons
-                  name="bookmark-outline"
-                  size={18}
-                  color={colors.textMuted}
+                  name={bookmarked ? 'bookmark' : 'bookmark-outline'}
+                  size={20}
+                  color={bookmarked ? accentColor : colors.textMuted}
                 />
               </Pressable>
 
               {card.isExpandable && (
-                <Pressable style={styles.expandButton} onPress={toggleExpand}>
-                  <Text style={[styles.expandText, { color: colors.primary }]}>
+                <Pressable
+                  style={[
+                    styles.expandButton,
+                    { backgroundColor: `${accentColor}15` },
+                  ]}
+                  onPress={toggleExpand}
+                >
+                  <Text style={[styles.expandText, { color: accentColor }]}>
                     {expanded ? 'Show Less' : 'View Details'}
                   </Text>
                   <Ionicons
                     name={expanded ? 'chevron-up' : 'chevron-down'}
                     size={14}
-                    color={colors.primary}
+                    color={accentColor}
                   />
                 </Pressable>
               )}
@@ -567,8 +685,11 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     width: '100%',
-    height: 180,
+    height: CARD_IMAGE_HEIGHT,
     position: 'relative',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
   },
   cardImage: {
     width: '100%',
@@ -579,9 +700,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  imageOverlay: {
+  imageGradient: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  imageBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  imageBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  locationBadge: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  locationBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '500',
   },
   content: {
     padding: 20,
@@ -611,6 +765,9 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 12,
   },
+  timeTextBelow: {
+    marginBottom: 8,
+  },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -636,16 +793,25 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   actionButton: {
-    padding: 6,
-    marginRight: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    padding: 8,
+    marginRight: 8,
+  },
+  actionLabel: {
+    fontSize: 11,
+    color: '#FF4757',
+    fontWeight: '500',
   },
   expandButton: {
     marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
   },
   expandText: {
     fontSize: 12,

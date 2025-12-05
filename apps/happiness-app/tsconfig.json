@@ -6,7 +6,6 @@
     "paths": {
       "@/*": ["./*"]
     },
-    "module": "esnext",
     "moduleResolution": "bundler",
     "forceConsistentCasingInFileNames": true
   },

@@ -25,6 +25,10 @@ interface UserState {
   hapticEnabled: boolean;
   voiceEnabled: boolean;
 
+  // Feed interactions
+  likedCards: string[];
+  bookmarkedCards: string[];
+
   // Actions
   setUser: (user: Partial<User>) => void;
   updateCredits: (amount: number) => void;
@@ -37,6 +41,12 @@ interface UserState {
   setNotificationsEnabled: (enabled: boolean) => void;
   setHapticEnabled: (enabled: boolean) => void;
   setVoiceEnabled: (enabled: boolean) => void;
+
+  // Feed actions
+  toggleLikeCard: (cardId: string) => void;
+  toggleBookmarkCard: (cardId: string) => void;
+  isCardLiked: (cardId: string) => boolean;
+  isCardBookmarked: (cardId: string) => boolean;
 
   // Auth actions
   login: (
@@ -74,6 +84,8 @@ export const useUserStore = create<UserState>()(
       notificationsEnabled: true,
       hapticEnabled: true,
       voiceEnabled: true,
+      likedCards: [],
+      bookmarkedCards: [],
 
       setUser: (userData) =>
         set((state) => ({
@@ -177,6 +189,31 @@ export const useUserStore = create<UserState>()(
             .catch(console.error);
         }
       },
+
+      toggleLikeCard: (cardId) => {
+        set((state) => {
+          const isLiked = state.likedCards.includes(cardId);
+          return {
+            likedCards: isLiked
+              ? state.likedCards.filter((id) => id !== cardId)
+              : [...state.likedCards, cardId],
+          };
+        });
+      },
+
+      toggleBookmarkCard: (cardId) => {
+        set((state) => {
+          const isBookmarked = state.bookmarkedCards.includes(cardId);
+          return {
+            bookmarkedCards: isBookmarked
+              ? state.bookmarkedCards.filter((id) => id !== cardId)
+              : [...state.bookmarkedCards, cardId],
+          };
+        });
+      },
+
+      isCardLiked: (cardId) => get().likedCards.includes(cardId),
+      isCardBookmarked: (cardId) => get().bookmarkedCards.includes(cardId),
 
       login: async (email, password) => {
         set({ isLoading: true });
@@ -385,6 +422,8 @@ export const useUserStore = create<UserState>()(
         notificationsEnabled: state.notificationsEnabled,
         hapticEnabled: state.hapticEnabled,
         voiceEnabled: state.voiceEnabled,
+        likedCards: state.likedCards,
+        bookmarkedCards: state.bookmarkedCards,
       }),
     }
   )

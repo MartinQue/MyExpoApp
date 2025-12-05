@@ -18,9 +18,11 @@
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules",
     "install-all": "npm install"
   },
-  "devDependencies": {},
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
+  },
+  "dependencies": {
+    "react-native-webview": "^13.16.0"
   }
 }

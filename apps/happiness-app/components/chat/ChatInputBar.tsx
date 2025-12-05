@@ -12,6 +12,7 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -21,6 +22,9 @@ import Animated, {
   withSequence,
   withTiming,
   Easing,
+  SharedValue,
+  interpolate,
+  Extrapolation,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -29,8 +33,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useVoiceContext } from '@/contexts/VoiceContext';
 import haptics from '@/lib/haptics';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const TAB_BAR_HEIGHT = 49;
+const BAR_HEIGHT_IDLE = 110;
+const BAR_HEIGHT_RECORDING = 56;
 
 interface ChatInputBarProps {
   onSend: (text: string, attachment?: AttachmentInfo) => void;
@@ -40,8 +48,7 @@ interface ChatInputBarProps {
   isLoading?: boolean;
   isTranscribing?: boolean;
   recordingDuration?: number;
-  showCamera?: boolean;
-  onCameraPress?: () => void;
+  placeholder?: string;
 }
 
 interface AttachmentInfo {
@@ -51,7 +58,79 @@ interface AttachmentInfo {
   mimeType?: string;
 }
 
-// Removed static THEME - now using dynamic theme context
+function WaveBar({
+  value,
+  index,
+  isActive,
+}: {
+  value: SharedValue<number>;
+  index: number;
+  isActive: boolean;
+}) {
+  useEffect(() => {
+    if (isActive) {
+      value.value = withRepeat(
+        withSequence(
+          withTiming(1, {
+            duration: 300 + index * 50,
+            easing: Easing.inOut(Easing.ease),
+          }),
+          withTiming(0.3, {
+            duration: 300 + index * 50,
+            easing: Easing.inOut(Easing.ease),
+          })
+        ),
+        -1,
+        true
+      );
+    } else {
+      value.value = withSpring(0.3);
+    }
+  }, [isActive, index, value]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    height: interpolate(value.value, [0, 1], [6, 20], Extrapolation.CLAMP),
+  }));
+
+  return <Animated.View style={[styles.waveBar, animatedStyle]} />;
+}
+
+function VoiceWaveAnimation({ isActive }: { isActive: boolean }) {
+  const bar0 = useSharedValue(0.3);
+  const bar1 = useSharedValue(0.5);
+  const bar2 = useSharedValue(0.4);
+  const bar3 = useSharedValue(0.6);
+  const bar4 = useSharedValue(0.5);
+
+  return (
+    <View style={styles.waveContainer}>
+      <WaveBar value={bar0} index={0} isActive={isActive} />
+      <WaveBar value={bar1} index={1} isActive={isActive} />
+      <WaveBar value={bar2} index={2} isActive={isActive} />
+      <WaveBar value={bar3} index={3} isActive={isActive} />
+      <WaveBar value={bar4} index={4} isActive={isActive} />
+    </View>
+  );
+}
+
+function AttachmentOption({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: string;
+  label: string;
+  onPress?: () => void;
+}) {
+  return (
+    <TouchableOpacity style={styles.attachmentOption} onPress={onPress}>
+      <View style={styles.attachmentIconBadge}>
+        <Ionicons name={icon as any} size={20} color="#fff" />
+      </View>
+      <Text style={styles.attachmentLabel}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
 
 export function ChatInputBar({
   onSend,
@@ -61,53 +140,56 @@ export function ChatInputBar({
   isLoading,
   isTranscribing,
   recordingDuration = 0,
-  showCamera = false,
-  onCameraPress,
+  placeholder = 'Ask Anything',
 }: ChatInputBarProps) {
   const { colors, isDark } = useTheme();
-  const { error: voiceError } = useVoiceContext();
   const [text, setText] = useState('');
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [showAttachments, setShowAttachments] = useState(false);
   const [attachment, setAttachment] = useState<AttachmentInfo | null>(null);
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const router = useRouter();
 
-  // Animation for recording pulse
-  const pulseScale = useSharedValue(1);
-
-  // Use either external listening state or internal recording state
   const isListening = !!externalIsListening;
 
-  // Recording pulse animation
+  const barHeight = useSharedValue(BAR_HEIGHT_IDLE);
+  const optionsOpacity = useSharedValue(0);
+  const statusOpacity = useSharedValue(0);
+
   useEffect(() => {
     if (isListening) {
-      pulseScale.value = withRepeat(
-        withSequence(
-          withTiming(1.2, { duration: 500, easing: Easing.inOut(Easing.ease) }),
-          withTiming(1, { duration: 500, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1,
-        false
-      );
+      barHeight.value = withTiming(BAR_HEIGHT_RECORDING, { duration: 200 });
+      optionsOpacity.value = withTiming(1, { duration: 200 });
+      statusOpacity.value = withTiming(1, { duration: 300 });
     } else {
-      pulseScale.value = withSpring(1);
+      barHeight.value = withTiming(BAR_HEIGHT_IDLE, { duration: 200 });
+      optionsOpacity.value = withTiming(0, { duration: 150 });
+      statusOpacity.value = withTiming(0, { duration: 150 });
     }
-  }, [isListening, pulseScale]);
+  }, [isListening, barHeight, optionsOpacity, statusOpacity]);
 
-  const pulseAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseScale.value }],
+  const barAnimatedStyle = useAnimatedStyle(() => ({
+    height: barHeight.value,
+  }));
+
+  const optionsAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: optionsOpacity.value,
+    transform: [{ translateY: interpolate(optionsOpacity.value, [0, 1], [10, 0]) }],
+  }));
+
+  const statusAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: statusOpacity.value,
   }));
 
   useEffect(() => {
     const keyboardWillShow = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => setKeyboardVisible(true)
+      (e) => setKeyboardHeight(e.endCoordinates.height)
     );
     const keyboardWillHide = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardVisible(false)
+      () => setKeyboardHeight(0)
     );
 
     return () => {
@@ -116,33 +198,32 @@ export function ChatInputBar({
     };
   }, []);
 
+  const dismissKeyboard = useCallback(() => {
+    Keyboard.dismiss();
+    inputRef.current?.blur();
+  }, []);
+
   const handleSend = () => {
     if (!text.trim() && !attachment) return;
     onSend(text, attachment || undefined);
     setText('');
     setAttachment(null);
+    dismissKeyboard();
     haptics.send();
   };
 
-  // Camera handler
   const handleCamera = async () => {
     setShowAttachments(false);
-
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(
-        'Permission needed',
-        'Camera access is required to take photos'
-      );
+      Alert.alert('Permission needed', 'Camera access is required');
       return;
     }
-
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
       allowsEditing: true,
     });
-
     if (!result.canceled && result.assets[0]) {
       setAttachment({
         type: 'image',
@@ -153,22 +234,18 @@ export function ChatInputBar({
     }
   };
 
-  // Photo library handler
   const handlePhotos = async () => {
     setShowAttachments(false);
-
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission needed', 'Photo library access is required');
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
       allowsEditing: true,
     });
-
     if (!result.canceled && result.assets[0]) {
       setAttachment({
         type: 'image',
@@ -179,16 +256,13 @@ export function ChatInputBar({
     }
   };
 
-  // Document handler
   const handleFiles = async () => {
     setShowAttachments(false);
-
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: '*/*',
         copyToCacheDirectory: true,
       });
-
       if (!result.canceled && result.assets[0]) {
         setAttachment({
           type: 'document',
@@ -203,240 +277,221 @@ export function ChatInputBar({
     }
   };
 
-  // Image generation - navigate to Imagine tab
   const handleCreateImage = () => {
     setShowAttachments(false);
     haptics.selection();
     router.push('/(tabs)/imagine' as any);
   };
 
-  // Remove attachment
   const removeAttachment = () => {
     setAttachment(null);
     haptics.selection();
   };
 
-  const handleMicPress = useCallback(async () => {
+  const handleMicPress = useCallback(() => {
     if (isTranscribing) return;
+    dismissKeyboard();
     haptics.selection();
     onVoiceToggle?.(!isListening);
-  }, [isListening, isTranscribing, onVoiceToggle]);
-
-  const handleCancelRecording = useCallback(async () => {
-    haptics.warning();
-    if (onCancelRecording) {
-      await onCancelRecording();
-    } else {
-      onVoiceToggle?.(false);
-    }
-    onVoiceToggle?.(false);
-  }, [onCancelRecording, onVoiceToggle]);
-
-  // Format recording duration
-  const formatDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  }, [isListening, isTranscribing, onVoiceToggle, dismissKeyboard]);
 
   const toggleAttachments = () => {
     haptics.selection();
     setShowAttachments(!showAttachments);
   };
 
-  // Dynamic padding to account for tab bar + 12px gap
-  // TAB_BAR_HEIGHT = 84 (iOS) / 66 (Android) + CHAT_BAR_GAP (12px)
-  // Total: 96px iOS, 78px Android when keyboard hidden
-  const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 84 : 66;
-  const CHAT_BAR_GAP = 12;
+  const KEYBOARD_GAP = 10;
+  const NAVBAR_GAP = 12;
   
-  const bottomPadding = keyboardVisible
-    ? Math.max(insets.bottom, 12) + 8
-    : TAB_BAR_HEIGHT + CHAT_BAR_GAP;
+  const bottomOffset = keyboardHeight > 0
+    ? keyboardHeight + KEYBOARD_GAP
+    : insets.bottom + TAB_BAR_HEIGHT + NAVBAR_GAP;
+
+  const getStatusText = () => {
+    if (isTranscribing) return 'Processing...';
+    if (recordingDuration > 0) return 'Start talking';
+    return 'Connecting...';
+  };
+
+  const textColor = isDark ? '#fff' : colors.text;
+  const placeholderColor = isDark ? 'rgba(255,255,255,0.4)' : colors.textMuted;
+  const iconColor = isDark ? 'rgba(255,255,255,0.6)' : colors.textSecondary;
 
   return (
     <>
-      <BlurView
-        intensity={isDark ? 80 : 50}
-        tint={isDark ? 'dark' : 'light'}
+      {isListening && (
+        <Animated.View
+          style={[
+            styles.statusTextWrapper,
+            statusAnimatedStyle,
+            { bottom: bottomOffset + BAR_HEIGHT_RECORDING + 80 },
+          ]}
+        >
+          <VoiceWaveAnimation isActive={isListening && !isTranscribing} />
+          <Text style={[styles.statusText, { color: isDark ? 'rgba(255,255,255,0.7)' : colors.textSecondary }]}>
+            {getStatusText()}
+          </Text>
+        </Animated.View>
+      )}
+
+      {isListening && (
+        <Animated.View
+          style={[
+            styles.optionsRow,
+            optionsAnimatedStyle,
+            { bottom: bottomOffset + BAR_HEIGHT_RECORDING + 16 },
+          ]}
+        >
+          <BlurView intensity={isDark ? 60 : 40} tint={isDark ? 'dark' : 'light'} style={styles.optionPillBlur}>
+            <TouchableOpacity style={styles.optionPillInner}>
+              <Ionicons name="scan-outline" size={20} color={textColor} />
+            </TouchableOpacity>
+          </BlurView>
+          <BlurView intensity={isDark ? 60 : 40} tint={isDark ? 'dark' : 'light'} style={styles.optionPillBlur}>
+            <TouchableOpacity style={styles.optionPillInner}>
+              <Ionicons name="volume-high-outline" size={20} color={textColor} />
+            </TouchableOpacity>
+          </BlurView>
+          <BlurView intensity={isDark ? 60 : 40} tint={isDark ? 'dark' : 'light'} style={styles.optionPillBlur}>
+            <TouchableOpacity style={styles.optionPillInner}>
+              <Ionicons name="mic-outline" size={20} color={textColor} />
+            </TouchableOpacity>
+          </BlurView>
+          <View style={styles.optionPillWithEmoji}>
+            <BlurView intensity={isDark ? 60 : 40} tint={isDark ? 'dark' : 'light'} style={styles.optionPillBlur}>
+              <TouchableOpacity style={styles.optionPillInner}>
+                <Ionicons name="settings-outline" size={20} color={textColor} />
+              </TouchableOpacity>
+            </BlurView>
+            <View style={[styles.emojiBadge, { backgroundColor: isDark ? 'rgba(58, 58, 60, 0.95)' : 'rgba(255, 255, 255, 0.9)' }]}>
+              <Text style={styles.emojiText}>😊</Text>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+
+      <Animated.View
         style={[
-          styles.container,
-          {
-            paddingBottom: bottomPadding,
-            borderTopColor: isDark 
-              ? 'rgba(255,255,255,0.15)' 
-              : 'rgba(0,0,0,0.1)',
-            backgroundColor: isDark
-              ? 'rgba(10,10,15,0.5)'
-              : 'rgba(255,255,255,0.5)',
-          },
+          styles.barWrapper,
+          barAnimatedStyle,
+          { bottom: bottomOffset },
         ]}
       >
-        {/* Voice Wave Animation */}
-        {isListening && (
-          <View style={styles.voiceWaveContainer}>
-            <VoiceWaveAnimation />
-          </View>
-        )}
-
-        <View style={styles.innerContainer}>
-          {/* Left: Circular Mic Button */}
-          <Animated.View style={isListening ? pulseAnimatedStyle : undefined}>
-            <TouchableOpacity
-              onPress={handleMicPress}
-              onLongPress={isListening ? handleCancelRecording : undefined}
-              delayLongPress={1000}
-              disabled={isTranscribing}
-              style={[
-                styles.micButton,
-                {
-                  backgroundColor: isListening 
-                    ? '#FF3B30' 
-                    : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'),
-                  borderColor: isListening ? '#FF3B30' : colors.glassBorder,
-                },
-              ]}
-            >
-              {isTranscribing ? (
-                <ActivityIndicator size="small" color={colors.text} />
-              ) : (
-                <Ionicons
-                  name={isListening ? 'stop' : 'mic'}
-                  size={24}
-                  color={isListening ? '#FFF' : colors.text}
+        <BlurView 
+          intensity={isDark ? 80 : 60} 
+          tint={isDark ? 'dark' : 'light'} 
+          style={[
+            styles.barBlur,
+            { 
+              backgroundColor: isDark ? 'rgba(28, 28, 30, 0.85)' : 'rgba(255, 253, 250, 0.85)',
+              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(45, 42, 38, 0.12)',
+            }
+          ]}
+        >
+          {isListening ? (
+            <View style={styles.recordingContent}>
+              <TextInput
+                ref={inputRef}
+                style={[styles.textInputRecording, { color: placeholderColor }]}
+                placeholder={placeholder}
+                placeholderTextColor={placeholderColor}
+                value={text}
+                onChangeText={setText}
+                editable={false}
+              />
+              <TouchableOpacity
+                onPress={handleMicPress}
+                disabled={isTranscribing}
+                style={styles.stopButton}
+              >
+                {isTranscribing ? (
+                  <ActivityIndicator size="small" color="#000" />
+                ) : (
+                  <>
+                    <View style={styles.stopIcon} />
+                    <Text style={styles.stopText}>Stop</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <View style={styles.inputRow}>
+                <TextInput
+                  ref={inputRef}
+                  style={[styles.textInput, { color: textColor }]}
+                  placeholder={placeholder}
+                  placeholderTextColor={placeholderColor}
+                  value={text}
+                  onChangeText={setText}
+                  multiline
+                  maxLength={2000}
+                  onSubmitEditing={handleSend}
+                  blurOnSubmit={false}
                 />
-              )}
-            </TouchableOpacity>
-          </Animated.View>
+              </View>
 
-          {/* Optional: Camera Button (Grok Alter Ego Style) */}
-          {showCamera && (
-            <TouchableOpacity
-              onPress={onCameraPress || handleCamera}
-              style={[
-                styles.micButton, // Reusing mic button shape
-                {
-                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                  borderColor: colors.glassBorder,
-                },
-              ]}
-            >
-              <Ionicons
-                name="camera-outline"
-                size={24}
-                color={colors.text}
-              />
-            </TouchableOpacity>
+              <View style={styles.controlsRow}>
+                <TouchableOpacity
+                  onPress={toggleAttachments}
+                  style={[styles.controlButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(45, 42, 38, 0.06)' }]}
+                >
+                  <Ionicons name="attach" size={22} color={iconColor} />
+                </TouchableOpacity>
+
+                <View style={styles.spacer} />
+
+                {text.trim() || attachment ? (
+                  <TouchableOpacity onPress={handleSend} style={[styles.sendButton, { backgroundColor: isDark ? '#fff' : colors.primary }]}>
+                    <Ionicons name="arrow-up" size={18} color={isDark ? '#000' : '#fff'} />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    onPress={handleMicPress}
+                    disabled={isTranscribing}
+                    style={[styles.speakButton, { backgroundColor: isDark ? '#fff' : colors.primary }]}
+                  >
+                    <View style={styles.speakWaveIcon}>
+                      <View style={[styles.speakWaveBarShort, { backgroundColor: isDark ? '#000' : '#fff' }]} />
+                      <View style={[styles.speakWaveBarTall, { backgroundColor: isDark ? '#000' : '#fff' }]} />
+                      <View style={[styles.speakWaveBarShort, { backgroundColor: isDark ? '#000' : '#fff' }]} />
+                    </View>
+                    <Text style={[styles.speakText, { color: isDark ? '#000' : '#fff' }]}>Speak</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </>
           )}
+        </BlurView>
+      </Animated.View>
 
-          {/* Center: Glassmorphism Text Input Pill */}
-          <View
-            style={[
-              styles.inputPill,
-              {
-                backgroundColor: isDark
-                  ? 'rgba(255,255,255,0.1)'
-                  : 'rgba(0,0,0,0.05)',
-                borderColor: isDark 
-                  ? 'rgba(255,255,255,0.2)' 
-                  : 'rgba(0,0,0,0.1)',
-              },
-            ]}
-          >
-            <TouchableOpacity
-              onPress={toggleAttachments}
-              style={styles.attachButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons
-                name="attach"
-                size={20}
-                color={colors.inputPlaceholder}
-              />
-            </TouchableOpacity>
-
-            <TextInput
-              ref={inputRef}
-              style={[styles.input, { color: colors.text }]}
-              placeholder="Ask anything..."
-              placeholderTextColor={colors.inputPlaceholder}
-              value={text}
-              onChangeText={setText}
-              multiline
-              maxLength={500}
-              returnKeyType="default"
-            />
-          </View>
-
-          {/* Right: Text Button */}
-          <TouchableOpacity
-            onPress={handleSend}
-            disabled={!text.trim() && !attachment}
-            style={[
-              styles.textButton,
-              {
-                backgroundColor: text.trim() || attachment 
-                  ? (isDark ? '#FFF' : '#000')
-                  : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'),
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.textButtonLabel,
-                {
-                  color: text.trim() || attachment 
-                    ? (isDark ? '#000' : '#FFF')
-                    : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)'),
-                },
-              ]}
-            >
-              Text
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </BlurView>
-
-      {/* Attachment Preview */}
-      {attachment && (
+      {attachment && !isListening && (
         <View
           style={[
             styles.attachmentPreview,
-            {
-              backgroundColor: colors.glassBackgroundStrong,
-              borderColor: colors.glassBorder,
+            { 
+              bottom: bottomOffset + BAR_HEIGHT_IDLE + 12,
+              backgroundColor: isDark ? 'rgba(30,30,30,0.95)' : 'rgba(255,253,250,0.95)',
+              borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(45,42,38,0.1)',
             },
           ]}
         >
           {attachment.type === 'image' ? (
-            <Image
-              source={{ uri: attachment.uri }}
-              style={styles.attachmentImage}
-            />
+            <Image source={{ uri: attachment.uri }} style={styles.attachmentImage} />
           ) : (
             <View style={styles.documentPreview}>
-              <Ionicons name="document-text" size={24} color={colors.text} />
-              <Text
-                style={[styles.documentName, { color: colors.text }]}
-                numberOfLines={1}
-              >
+              <Ionicons name="document-text" size={24} color={textColor} />
+              <Text style={[styles.documentName, { color: textColor }]} numberOfLines={1}>
                 {attachment.name || 'Document'}
               </Text>
             </View>
           )}
-          <TouchableOpacity
-            style={[
-              styles.removeAttachment,
-              { backgroundColor: colors.surface },
-            ]}
-            onPress={removeAttachment}
-          >
-            <Ionicons name="close-circle" size={24} color={colors.error} />
+          <TouchableOpacity style={styles.removeAttachment} onPress={removeAttachment}>
+            <Ionicons name="close-circle" size={24} color="#FF3B30" />
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Attachment Menu Modal */}
       <Modal
         visible={showAttachments}
         transparent
@@ -450,339 +505,207 @@ export function ChatInputBar({
               tint={isDark ? 'dark' : 'light'}
               style={[
                 styles.attachmentMenu,
-                {
-                  backgroundColor: colors.glassBackgroundStrong,
-                  borderColor: colors.glassBorder,
+                { 
+                  bottom: bottomOffset + BAR_HEIGHT_IDLE + 12,
+                  borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(45,42,38,0.1)',
                 },
               ]}
             >
-              <AttachmentOption
-                icon="camera-outline"
-                label="Camera"
-                onPress={handleCamera}
-                textColor={colors.text}
-              />
-              <AttachmentOption
-                icon="images-outline"
-                label="Photos"
-                onPress={handlePhotos}
-                textColor={colors.text}
-              />
-              <AttachmentOption
-                icon="document-text-outline"
-                label="Files"
-                onPress={handleFiles}
-                textColor={colors.text}
-              />
-              <AttachmentOption
-                icon="sparkles-outline"
-                label="Create image"
-                onPress={handleCreateImage}
-                textColor={colors.text}
-              />
+              <AttachmentOption icon="camera-outline" label="Camera" onPress={handleCamera} />
+              <AttachmentOption icon="images-outline" label="Photos" onPress={handlePhotos} />
+              <AttachmentOption icon="document-outline" label="Files" onPress={handleFiles} />
+              <View style={[styles.menuDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(45,42,38,0.1)' }]} />
+              <AttachmentOption icon="sparkles-outline" label="Create image" onPress={handleCreateImage} />
             </BlurView>
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-
-      {voiceError && (
-        <View style={styles.voiceErrorContainer}>
-          <Ionicons name="alert-circle" size={16} color={colors.error} />
-          <Text style={[styles.voiceErrorText, { color: colors.error }]}>
-            {voiceError}
-          </Text>
-        </View>
-      )}
     </>
   );
 }
 
-function VoiceWaveAnimation() {
-  const wave1 = useSharedValue(0.3);
-  const wave2 = useSharedValue(0.5);
-  const wave3 = useSharedValue(0.4);
-  const wave4 = useSharedValue(0.6);
-
-  useEffect(() => {
-    wave1.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 400, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.3, { duration: 400, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1
-    );
-    wave2.value = withRepeat(
-      withSequence(
-        withTiming(0.8, { duration: 350, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.5, { duration: 350, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1
-    );
-    wave3.value = withRepeat(
-      withSequence(
-        withTiming(0.9, { duration: 450, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.4, { duration: 450, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1
-    );
-    wave4.value = withRepeat(
-      withSequence(
-        withTiming(0.7, { duration: 380, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.6, { duration: 380, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1
-    );
-  }, []);
-
-  const createBarStyle = (sharedValue: any) =>
-    useAnimatedStyle(() => ({
-      height: `${sharedValue.value * 100}%`,
-    }));
-
-  return (
-    <View style={styles.waveContainer}>
-      <Animated.View style={[styles.waveBar, createBarStyle(wave1)]} />
-      <Animated.View style={[styles.waveBar, createBarStyle(wave2)]} />
-      <Animated.View style={[styles.waveBar, createBarStyle(wave3)]} />
-      <Animated.View style={[styles.waveBar, createBarStyle(wave4)]} />
-    </View>
-  );
-}
-
-function AttachmentOption({
-  icon,
-  label,
-  onPress,
-  textColor = '#FFF',
-}: {
-  icon: any;
-  label: string;
-  onPress?: () => void;
-  textColor?: string;
-}) {
-  return (
-    <TouchableOpacity style={styles.attachmentOption} onPress={onPress}>
-      <View style={styles.attachmentIconBadge}>
-        <Ionicons
-          name={icon}
-          size={20}
-          color={textColor}
-          style={styles.attachmentIcon}
-        />
-      </View>
-      <Text style={[styles.attachmentLabel, { color: textColor }]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: {
-    borderTopWidth: 1,
-    paddingTop: 12,
-    paddingHorizontal: 12,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+  barWrapper: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    borderRadius: 24,
+    overflow: 'hidden',
   },
-  innerContainer: {
+  barBlur: {
+    flex: 1,
+    borderRadius: 24,
+    borderWidth: 0.5,
+    overflow: 'hidden',
+  },
+  inputRow: {
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 10,
+  },
+  textInput: {
+    fontSize: 17,
+    color: '#fff',
+    maxHeight: 60,
+    minHeight: 24,
+    paddingVertical: 0,
+  },
+  controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingBottom: 14,
     gap: 8,
-    height: 56,
   },
-  
-  // Voice Wave Animation
-  voiceWaveContainer: {
-    position: 'absolute',
-    bottom: 68,
-    left: 0,
-    right: 0,
-    height: 40,
+  controlButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  spacer: {
+    flex: 1,
+  },
+  sendButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  speakButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 38,
+    paddingHorizontal: 16,
+    borderRadius: 19,
+    backgroundColor: '#fff',
+  },
+  speakText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#000',
+  },
+  speakWaveIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  speakWaveBarShort: {
+    width: 2.5,
+    height: 8,
+    backgroundColor: '#000',
+    borderRadius: 1.25,
+  },
+  speakWaveBarTall: {
+    width: 2.5,
+    height: 14,
+    backgroundColor: '#000',
+    borderRadius: 1.25,
+  },
+  recordingContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    gap: 12,
+  },
+  textInputRecording: {
+    flex: 1,
+    fontSize: 17,
+    color: 'rgba(255,255,255,0.4)',
+    paddingVertical: 0,
+  },
+  stopButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 38,
+    paddingHorizontal: 16,
+    borderRadius: 19,
+    backgroundColor: '#fff',
+  },
+  stopText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#000',
+  },
+  stopIcon: {
+    width: 10,
+    height: 10,
+    backgroundColor: '#000',
+    borderRadius: 2,
+  },
+  statusTextWrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    gap: 12,
+  },
+  statusText: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '500',
+  },
+  optionsRow: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  optionPillBlur: {
+    flex: 1,
+    height: 50,
+    borderRadius: 25,
+    overflow: 'hidden',
+  },
+  optionPillInner: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  optionPillWithEmoji: {
+    flex: 1,
+    position: 'relative',
+  },
+  emojiBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emojiText: {
+    fontSize: 12,
   },
   waveContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    height: 40,
+    gap: 3,
+    height: 24,
   },
   waveBar: {
     width: 3,
-    backgroundColor: '#007AFF',
     borderRadius: 1.5,
-    minHeight: 8,
+    backgroundColor: '#fff',
+    minHeight: 6,
   },
-
-  // Left: Mic Button
-  micButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-
-  // Center: Input Pill
-  inputPill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 56,
-    borderRadius: 28,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  attachButton: {
-    marginRight: 8,
-    padding: 4,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    maxHeight: 80,
-    paddingTop: 0,
-    paddingBottom: 0,
-  },
-
-  // Right: Text Button
-  textButton: {
-    height: 56,
-    minWidth: 72,
-    paddingHorizontal: 24,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  textButtonLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  // Legacy styles (kept for reference/removal)
-  inputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 24,
-    minHeight: 52,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  paperclipButton: {
-    marginRight: 8,
-    padding: 4,
-  },
-  speakButton: {
-    height: 52,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 22,
-  },
-  speakContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  speakText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  stopContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  stopIcon: {
-    width: 12,
-    height: 12,
-    backgroundColor: '#FF3B30',
-    borderRadius: 2,
-  },
-  stopText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  sendButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  recordingButton: {
-    backgroundColor: '#FF3B30',
-  },
-  transcribingButton: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  transcribingText: {
-    color: '#000',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  // Attachment Menu
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 16,
-  },
-  attachmentMenu: {
-    position: 'absolute',
-    bottom: 80,
-    left: 20,
-    width: 200,
-    borderRadius: 16,
-    overflow: 'hidden',
-    paddingVertical: 12,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  attachmentOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    columnGap: 12,
-  },
-  attachmentIconBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  attachmentIcon: {
-    marginRight: 0,
-  },
-  attachmentLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  // Attachment Preview
   attachmentPreview: {
     position: 'absolute',
-    top: -80,
-    left: 12,
-    right: 12,
+    left: 16,
+    right: 16,
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 16,
@@ -801,7 +724,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   documentName: {
-    color: '#FFF',
+    color: '#fff',
     fontSize: 14,
     flex: 1,
   },
@@ -809,18 +732,47 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -8,
     right: -8,
-    backgroundColor: '#1C1C1E',
-    borderRadius: 12,
   },
-  voiceErrorContainer: {
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  attachmentMenu: {
+    position: 'absolute',
+    left: 16,
+    width: 200,
+    borderRadius: 16,
+    overflow: 'hidden',
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  attachmentOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    gap: 14,
   },
-  voiceErrorText: {
-    fontSize: 13,
+  attachmentIconBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  attachmentLabel: {
+    fontSize: 16,
     fontWeight: '500',
+    color: '#fff',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginVertical: 4,
+    marginHorizontal: 16,
   },
 });
+
+export default ChatInputBar;

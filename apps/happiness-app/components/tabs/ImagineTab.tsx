@@ -12,6 +12,8 @@ import {
   Keyboard,
   Alert,
   Modal,
+  Share,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +21,8 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import * as haptics from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -117,6 +121,74 @@ const QUICK_PROMPTS = [
   '🏙️ Futuristic city skyline',
   '🌸 Cherry blossoms in spring',
   '🐉 Mystical dragon',
+];
+
+// Template cards (Grok-style)
+const TEMPLATE_CARDS = [
+  {
+    id: 'girlfriend',
+    name: 'Add Girlfriend',
+    image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+    prompt: 'Add a beautiful girlfriend character to this scene',
+  },
+  {
+    id: 'thumbsup',
+    name: 'Thumbs Up',
+    image: 'https://images.unsplash.com/photo-1529539795054-3c162aab037a?w=400',
+    prompt: 'Add a person giving thumbs up gesture',
+  },
+  {
+    id: 'moneyrain',
+    name: 'Money Rain',
+    image: 'https://images.unsplash.com/photo-1553729459-efe14ef6055d?w=400',
+    prompt: 'Add raining money effect to the scene',
+  },
+  {
+    id: 'sunset',
+    name: 'Golden Hour',
+    image: 'https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=400',
+    prompt: 'Transform to golden hour sunset lighting',
+  },
+  {
+    id: 'neon',
+    name: 'Neon Glow',
+    image: 'https://images.unsplash.com/photo-1557683316-973673baf926?w=400',
+    prompt: 'Add cyberpunk neon glow effects',
+  },
+  {
+    id: 'vintage',
+    name: 'Vintage Film',
+    image: 'https://images.unsplash.com/photo-1502759683299-cdcd6974244f?w=400',
+    prompt: 'Apply vintage film photography style',
+  },
+];
+
+// Featured gallery items (Grok-style masonry)
+const FEATURED_GALLERY = [
+  {
+    id: 'feat1',
+    url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800',
+    prompt: 'Earth from space with city lights',
+    size: 'large',
+  },
+  {
+    id: 'feat2',
+    url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',
+    prompt: 'Train station at night with fog',
+    size: 'medium',
+  },
+  {
+    id: 'feat3',
+    url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800',
+    prompt: 'Snowy mountain peak under stars',
+    size: 'medium',
+  },
+  {
+    id: 'feat4',
+    url: 'https://images.unsplash.com/photo-1534067783941-51c9c23ecefd?w=800',
+    prompt: 'Hot air balloon over clouds',
+    size: 'large',
+  },
 ];
 
 // Generation modes
@@ -404,6 +476,95 @@ export default function ImagineTab() {
     </Animated.View>
   );
 
+  // Save image to camera roll
+  const handleSaveImage = async () => {
+    if (!generatedImage?.imageUrl) return;
+
+    haptics.button();
+
+    try {
+      // Request permission
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Please grant permission to save images to your photo library.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Download image to local file
+      const filename = `happiness-ai-${Date.now()}.png`;
+      // Use cacheDirectory from FileSystem module (cast to avoid TS issues)
+      const cacheDir =
+        (FileSystem as { cacheDirectory?: string }).cacheDirectory || '';
+      const fileUri = `${cacheDir}${filename}`;
+
+      const downloadResult = await (FileSystem as any).downloadAsync(
+        generatedImage.imageUrl,
+        fileUri
+      );
+
+      if (downloadResult.status !== 200) {
+        throw new Error('Failed to download image');
+      }
+
+      // Save to media library
+      const asset = await MediaLibrary.createAssetAsync(downloadResult.uri);
+
+      // Try to create/get an album for our app
+      const album = await MediaLibrary.getAlbumAsync('Happiness AI');
+      if (album) {
+        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+      } else {
+        await MediaLibrary.createAlbumAsync('Happiness AI', asset, false);
+      }
+
+      // Clean up temporary file
+      await (FileSystem as any).deleteAsync(fileUri, { idempotent: true });
+
+      haptics.success();
+      Alert.alert(
+        'Saved!',
+        'Image saved to your photo library in "Happiness AI" album'
+      );
+    } catch (error) {
+      console.error('Failed to save image:', error);
+      haptics.error();
+      Alert.alert('Save Failed', 'Could not save image. Please try again.');
+    }
+  };
+
+  // Share image
+  const handleShareImage = async () => {
+    if (!generatedImage?.imageUrl) return;
+
+    haptics.button();
+
+    try {
+      if (Platform.OS === 'ios') {
+        // On iOS, we can share the URL directly
+        await Share.share({
+          url: generatedImage.imageUrl,
+          message: `Check out this AI-generated image! Created with Happiness AI\n\nPrompt: "${prompt}"`,
+        });
+      } else {
+        // On Android, share as message with URL
+        await Share.share({
+          message: `Check out this AI-generated image! Created with Happiness AI\n\nPrompt: "${prompt}"\n\n${generatedImage.imageUrl}`,
+        });
+      }
+      haptics.success();
+    } catch (error) {
+      if ((error as any).message !== 'User did not share') {
+        console.error('Share failed:', error);
+        haptics.error();
+        Alert.alert('Share Failed', 'Could not share image. Please try again.');
+      }
+    }
+  };
+
   const renderGeneratedImage = () => (
     <Animated.View
       entering={FadeInUp.springify()}
@@ -419,22 +580,10 @@ export default function ImagineTab() {
         style={styles.resultOverlay}
       >
         <View style={styles.resultActions}>
-          <Pressable
-            style={styles.resultAction}
-            onPress={() => {
-              haptics.button();
-              Alert.alert('Saved!', 'Image saved to your library');
-            }}
-          >
+          <Pressable style={styles.resultAction} onPress={handleSaveImage}>
             <Ionicons name="download-outline" size={24} color="white" />
           </Pressable>
-          <Pressable
-            style={styles.resultAction}
-            onPress={() => {
-              haptics.button();
-              // TODO: Implement share
-            }}
-          >
+          <Pressable style={styles.resultAction} onPress={handleShareImage}>
             <Ionicons name="share-outline" size={24} color="white" />
           </Pressable>
           <Pressable
@@ -668,134 +817,213 @@ export default function ImagineTab() {
     </Pressable>
   );
 
-  // Hero section with example generations (Grok-style)
-  const renderHeroSection = () => {
-    const exampleGenerations = [
-      {
-        id: '1',
-        type: 'image' as const,
-        url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800',
-        prompt: 'A dreamy sunset over mountains',
-        model: 'DALL·E 3',
-      },
-      {
-        id: '2',
-        type: 'image' as const,
-        url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',
-        prompt: 'Cosmic nebula with stars',
-        model: 'DALL·E 3',
-      },
-      {
-        id: '3',
-        type: 'video' as const,
-        url: 'https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4',
-        prompt: 'Abstract fluid art animation',
-        model: 'Flux Pro',
-        thumbnail:
-          'https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=800',
-      },
-      {
-        id: '4',
-        type: 'image' as const,
-        url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800',
-        prompt: 'Futuristic city skyline',
-        model: 'Midjourney',
-      },
-    ];
+  // Animate your photos section (Grok-style)
+  const renderAnimatePhotosSection = () => {
+    // Demo photos - in production, these would come from user's camera roll
+    const userPhotos =
+      gallery.length > 0
+        ? gallery.slice(0, 4).map((g) => ({ id: g.id, url: g.imageUrl }))
+        : [
+            {
+              id: 'demo1',
+              url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+            },
+            {
+              id: 'demo2',
+              url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+            },
+            {
+              id: 'demo3',
+              url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400',
+            },
+          ];
 
     return (
       <Animated.View
         entering={FadeInDown.delay(100)}
-        style={styles.heroSection}
+        style={styles.animateSection}
       >
-        <View style={styles.heroHeader}>
-          <Text style={[styles.heroTitle, { color: colors.text }]}>
-            Inspiration Gallery
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionTitleLarge, { color: colors.text }]}>
+            Animate your photos
           </Text>
-          <Text style={[styles.heroSubtitle, { color: colors.textMuted }]}>
-            Examples of what you can create
-          </Text>
+          <Pressable
+            style={styles.seeAllButton}
+            onPress={() => {
+              haptics.button();
+              setShowGallery(true);
+            }}
+          >
+            <Text style={[styles.seeAllText, { color: colors.textMuted }]}>
+              See All
+            </Text>
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={colors.textMuted}
+            />
+          </Pressable>
         </View>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.heroScroll}
-          snapToInterval={width - 40}
-          decelerationRate="fast"
+          contentContainerStyle={styles.photosScroll}
         >
-          {exampleGenerations.map((item, index) => (
+          {userPhotos.map((photo, index) => (
             <Animated.View
-              key={item.id}
-              entering={FadeInRight.delay(200 + index * 100)}
-              style={styles.heroCard}
+              key={photo.id}
+              entering={FadeInRight.delay(100 + index * 50)}
             >
-              <BlurView
-                intensity={isDark ? 40 : 30}
-                tint={isDark ? 'dark' : 'light'}
-                style={styles.heroCardBlur}
+              <Pressable
+                style={styles.photoCard}
+                onPress={() => {
+                  haptics.button();
+                  // Open photo for animation
+                }}
               >
-                <View style={styles.heroMediaContainer}>
-                  {item.type === 'video' ? (
-                    <View style={styles.heroVideoContainer}>
-                      <Image
-                        source={{ uri: item.thumbnail }}
-                        style={styles.heroVideoThumbnail}
-                      />
-                      <View style={styles.heroPlayButton}>
-                        <Ionicons name="play" size={24} color="white" />
-                      </View>
-                    </View>
-                  ) : (
-                    <Image
-                      source={{ uri: item.url }}
-                      style={styles.heroImage}
-                      resizeMode="cover"
-                    />
-                  )}
-                  <View style={styles.heroModelBadge}>
-                    <Ionicons
-                      name="sparkles"
-                      size={12}
-                      color={colors.primary}
-                    />
-                    <Text
-                      style={[styles.heroModelText, { color: colors.primary }]}
-                    >
-                      {item.model}
-                    </Text>
+                <Image
+                  source={{ uri: photo.url }}
+                  style={styles.photoCardImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.photoCardOverlay}>
+                  <View style={styles.photoCardBadge}>
+                    <Ionicons name="sparkles" size={12} color="#ffffff" />
                   </View>
                 </View>
-                <View style={styles.heroContent}>
-                  <Text
-                    style={[styles.heroPrompt, { color: colors.text }]}
-                    numberOfLines={2}
-                  >
-                    {item.prompt}
-                  </Text>
+              </Pressable>
+            </Animated.View>
+          ))}
+          {/* Add photo button */}
+          <Pressable
+            style={[styles.addPhotoCard, { borderColor: colors.border }]}
+            onPress={handleSelectSourceImages}
+          >
+            <Ionicons name="add" size={32} color={colors.textMuted} />
+          </Pressable>
+        </ScrollView>
+      </Animated.View>
+    );
+  };
+
+  // Create from template section (Grok-style)
+  const renderTemplateSection = () => {
+    return (
+      <Animated.View
+        entering={FadeInDown.delay(200)}
+        style={styles.templateSection}
+      >
+        <Text style={[styles.sectionTitleLarge, { color: colors.text }]}>
+          Create from template
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.templatesScroll}
+        >
+          {TEMPLATE_CARDS.map((template, index) => (
+            <Animated.View
+              key={template.id}
+              entering={FadeInRight.delay(150 + index * 50)}
+            >
+              <Pressable
+                style={styles.templateCard}
+                onPress={() => {
+                  haptics.button();
+                  setPrompt(template.prompt);
+                  inputRef.current?.focus();
+                }}
+              >
+                <Image
+                  source={{ uri: template.image }}
+                  style={styles.templateImage}
+                  resizeMode="cover"
+                />
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.8)']}
+                  style={styles.templateGradient}
+                >
+                  <Text style={styles.templateName}>{template.name}</Text>
+                </LinearGradient>
+              </Pressable>
+            </Animated.View>
+          ))}
+        </ScrollView>
+      </Animated.View>
+    );
+  };
+
+  // Featured gallery section (Grok-style masonry)
+  const renderFeaturedGallery = () => {
+    return (
+      <Animated.View
+        entering={FadeInDown.delay(300)}
+        style={styles.featuredSection}
+      >
+        <View style={styles.featuredGrid}>
+          {/* First column */}
+          <View style={styles.featuredColumn}>
+            {FEATURED_GALLERY.filter((_, i) => i % 2 === 0).map(
+              (item, index) => (
+                <Animated.View
+                  key={item.id}
+                  entering={FadeInUp.delay(200 + index * 100)}
+                >
                   <Pressable
-                    style={styles.heroUseButton}
+                    style={[
+                      styles.featuredCard,
+                      item.size === 'large'
+                        ? styles.featuredCardLarge
+                        : styles.featuredCardMedium,
+                    ]}
                     onPress={() => {
                       haptics.button();
                       setPrompt(item.prompt);
                       inputRef.current?.focus();
                     }}
                   >
-                    <Ionicons
-                      name="arrow-forward"
-                      size={14}
-                      color={colors.primary}
+                    <Image
+                      source={{ uri: item.url }}
+                      style={styles.featuredImage}
+                      resizeMode="cover"
                     />
-                    <Text
-                      style={[styles.heroUseText, { color: colors.primary }]}
-                    >
-                      Use this
-                    </Text>
                   </Pressable>
-                </View>
-              </BlurView>
-            </Animated.View>
-          ))}
-        </ScrollView>
+                </Animated.View>
+              )
+            )}
+          </View>
+          {/* Second column */}
+          <View style={styles.featuredColumn}>
+            {FEATURED_GALLERY.filter((_, i) => i % 2 === 1).map(
+              (item, index) => (
+                <Animated.View
+                  key={item.id}
+                  entering={FadeInUp.delay(250 + index * 100)}
+                >
+                  <Pressable
+                    style={[
+                      styles.featuredCard,
+                      item.size === 'large'
+                        ? styles.featuredCardLarge
+                        : styles.featuredCardMedium,
+                    ]}
+                    onPress={() => {
+                      haptics.button();
+                      setPrompt(item.prompt);
+                      inputRef.current?.focus();
+                    }}
+                  >
+                    <Image
+                      source={{ uri: item.url }}
+                      style={styles.featuredImage}
+                      resizeMode="cover"
+                    />
+                  </Pressable>
+                </Animated.View>
+              )
+            )}
+          </View>
+        </View>
       </Animated.View>
     );
   };
@@ -1165,8 +1393,14 @@ export default function ImagineTab() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Hero Section with Example Generations */}
-            {renderHeroSection()}
+            {/* Animate your photos section (Grok-style) */}
+            {renderAnimatePhotosSection()}
+
+            {/* Create from template section (Grok-style) */}
+            {renderTemplateSection()}
+
+            {/* Featured gallery (Grok-style masonry) */}
+            {renderFeaturedGallery()}
 
             {/* Quality Selector */}
             {renderQualitySelector()}
@@ -1383,59 +1617,67 @@ export default function ImagineTab() {
           </ScrollView>
         )}
 
-        {/* Input Bar */}
+        {/* Input Bar (Grok-style) */}
         {!generatedImage && !isGenerating && (
-          <View style={styles.inputContainer}>
+          <View style={styles.grokInputContainer}>
             <BlurView
               intensity={isDark ? 60 : 40}
               tint={isDark ? 'dark' : 'light'}
-              style={styles.inputBlur}
+              style={styles.grokInputBlur}
             >
-              <View
-                style={[
-                  styles.inputWrapper,
-                  {
-                    backgroundColor: colors.glassBackgroundStrong,
-                    borderColor: colors.border,
-                  },
-                ]}
+              {/* Profile thumbnail */}
+              <View style={styles.grokProfileThumb}>
+                <Image
+                  source={{
+                    uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
+                  }}
+                  style={styles.grokProfileImage}
+                />
+              </View>
+
+              {/* Attachment button with camera overlay */}
+              <Pressable
+                style={styles.grokAttachButton}
+                onPress={handleSelectSourceImages}
               >
+                <Ionicons name="sparkles" size={18} color={colors.primary} />
+              </Pressable>
+
+              {/* Input field */}
+              <View style={styles.grokInputField}>
                 <TextInput
                   ref={inputRef}
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder={
-                    generationMode === 'video'
-                      ? 'Describe your video...'
-                      : generationMode === 'multi'
-                      ? 'Describe how to combine images...'
-                      : 'Describe what you want to create...'
-                  }
+                  style={[styles.grokInput, { color: colors.text }]}
+                  placeholder="Type to imagine"
                   placeholderTextColor={colors.textMuted}
                   value={prompt}
                   onChangeText={setPrompt}
                   multiline
                   maxLength={500}
                 />
-                <Pressable
-                  style={[
-                    styles.generateButton,
-                    !prompt.trim() && styles.generateButtonDisabled,
-                  ]}
-                  onPress={handleGenerate}
-                  disabled={!prompt.trim()}
-                >
-                  <LinearGradient
-                    colors={
-                      prompt.trim()
-                        ? ['#8B5CF6', '#6366F1']
-                        : [colors.surface, colors.surface]
-                    }
-                    style={styles.generateGradient}
-                  >
-                    <Ionicons name="sparkles" size={20} color="white" />
-                  </LinearGradient>
-                </Pressable>
               </View>
+
+              {/* Speak button */}
+              <Pressable
+                style={[
+                  styles.grokSpeakButton,
+                  prompt.trim() && styles.grokSpeakButtonActive,
+                ]}
+                onPress={prompt.trim() ? handleGenerate : undefined}
+              >
+                {prompt.trim() ? (
+                  <Ionicons name="arrow-up" size={20} color="#000" />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="mic"
+                      size={16}
+                      color="rgba(255,255,255,0.7)"
+                    />
+                    <Text style={styles.grokSpeakText}>Speak</Text>
+                  </>
+                )}
+              </Pressable>
             </BlurView>
           </View>
         )}
@@ -2291,5 +2533,192 @@ const styles = StyleSheet.create({
   heroUseText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  // Grok-style Animate Photos Section
+  animateSection: {
+    marginBottom: 28,
+    paddingHorizontal: 4,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitleLarge: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  seeAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  photosScroll: {
+    gap: 12,
+    paddingRight: 20,
+  },
+  photoCard: {
+    width: 120,
+    height: 160,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  photoCardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    padding: 8,
+  },
+  photoCardBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(139, 92, 246, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addPhotoCard: {
+    width: 120,
+    height: 160,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  // Grok-style Template Section
+  templateSection: {
+    marginBottom: 28,
+    paddingHorizontal: 4,
+  },
+  templatesScroll: {
+    gap: 12,
+    paddingRight: 20,
+    marginTop: 16,
+  },
+  templateCard: {
+    width: 140,
+    height: 180,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  templateImage: {
+    width: '100%',
+    height: '100%',
+  },
+  templateGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  templateName: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Grok-style Featured Gallery (Masonry)
+  featuredSection: {
+    marginBottom: 28,
+    paddingHorizontal: 4,
+  },
+  featuredGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  featuredColumn: {
+    flex: 1,
+    gap: 12,
+  },
+  featuredCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  featuredCardLarge: {
+    height: 240,
+  },
+  featuredCardMedium: {
+    height: 180,
+  },
+  featuredImage: {
+    width: '100%',
+    height: '100%',
+  },
+  // Grok-style Input Bar
+  grokInputContainer: {
+    position: 'absolute',
+    bottom: 100,
+    left: 12,
+    right: 12,
+  },
+  grokInputBlur: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 28,
+    overflow: 'hidden',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    gap: 8,
+    backgroundColor: 'rgba(60, 60, 70, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  grokProfileThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  grokProfileImage: {
+    width: '100%',
+    height: '100%',
+  },
+  grokAttachButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  grokInputField: {
+    flex: 1,
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  grokInput: {
+    fontSize: 16,
+    paddingVertical: 8,
+  },
+  grokSpeakButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+  },
+  grokSpeakButtonActive: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  grokSpeakText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

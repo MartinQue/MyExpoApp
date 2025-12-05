@@ -155,21 +155,21 @@ const darkTheme: ThemeColors = {
 };
 
 // ============================================================
-// LIGHT THEME - Soft, elegant 2-tone pastels
+// LIGHT THEME - Warm diary/book-like tones with subtle color accents
 // ============================================================
 const lightTheme: ThemeColors = {
-  background: '#FAFBFC',
-  surface: '#FFFFFF',
+  background: '#FAF8F5', // Warm cream/paper
+  surface: '#FFFEFA', // Soft white with warmth
   surfaceElevated: '#FFFFFF',
 
-  text: '#1A1A1F',
-  textSecondary: '#4A4A55',
-  textMuted: '#9CA3AF',
+  text: '#2D2A26', // Warm dark brown
+  textSecondary: '#5C5650', // Muted brown
+  textMuted: '#9A928A', // Light brown/taupe
   textInverse: '#FFFFFF',
 
-  border: 'rgba(0, 0, 0, 0.08)',
-  borderLight: 'rgba(0, 0, 0, 0.04)',
-  borderStrong: 'rgba(0, 0, 0, 0.15)',
+  border: 'rgba(45, 42, 38, 0.1)',
+  borderLight: 'rgba(45, 42, 38, 0.05)',
+  borderStrong: 'rgba(45, 42, 38, 0.18)',
 
   primary: '#7C3AED',
   primaryLight: '#8B5CF6',
@@ -181,56 +181,56 @@ const lightTheme: ThemeColors = {
   error: '#DC2626',
   info: '#2563EB',
 
-  // Glassmorphism - Frosted glass effect for light mode
-  glassBackground: 'rgba(255, 255, 255, 0.7)',
-  glassBorder: 'rgba(0, 0, 0, 0.06)',
-  glassBackgroundStrong: 'rgba(255, 255, 255, 0.85)',
-  glassHighlight: 'rgba(255, 255, 255, 0.9)',
+  // Glassmorphism - Warm frosted glass for light mode
+  glassBackground: 'rgba(255, 253, 250, 0.85)',
+  glassBorder: 'rgba(45, 42, 38, 0.08)',
+  glassBackgroundStrong: 'rgba(255, 253, 250, 0.95)',
+  glassHighlight: 'rgba(255, 255, 255, 0.95)',
 
-  inputBackground: 'rgba(245, 245, 250, 0.9)',
-  inputBorder: 'rgba(0, 0, 0, 0.08)',
-  inputPlaceholder: '#9CA3AF',
+  inputBackground: 'rgba(250, 248, 245, 0.95)',
+  inputBorder: 'rgba(45, 42, 38, 0.12)',
+  inputPlaceholder: '#9A928A',
 
-  cardBackground: 'rgba(255, 255, 255, 0.9)',
-  cardBorder: 'rgba(0, 0, 0, 0.06)',
+  cardBackground: 'rgba(255, 254, 252, 0.9)',
+  cardBorder: 'rgba(45, 42, 38, 0.08)',
 
-  // Creative 2-tone gradients for light mode
+  // Warm diary-style gradients with subtle color accents
   gradients: {
     profile: {
-      start: '#F8F5FF', // Soft lavender
-      mid: '#EDE5FF', // Light purple
-      end: '#E0D4FF', // Gentle violet
-      accent: '#EC4899', // Pink
+      start: '#FBF8F5', // Warm cream
+      mid: '#F5EDE6', // Soft beige with lavender hint
+      end: '#EFE4DC', // Warm taupe
+      accent: '#9F7AEA', // Soft purple
     },
     planner: {
-      start: '#F0FDF4', // Mint cream
-      mid: '#DCFCE7', // Light mint
-      end: '#BBF7D0', // Fresh green
+      start: '#F9FAF5', // Cream with green tint
+      mid: '#F0F5EA', // Soft sage
+      end: '#E5EDD8', // Muted green
       accent: '#059669', // Emerald
     },
     library: {
-      start: '#EFF6FF', // Ice blue
-      mid: '#DBEAFE', // Sky blue
-      end: '#BFDBFE', // Soft azure
+      start: '#F8FAFB', // Cool cream
+      mid: '#EEF4F7', // Soft blue-gray
+      end: '#E3ECF2', // Muted blue
       accent: '#2563EB', // Royal blue
     },
     chat: {
-      start: '#FAFAFA', // Near white
-      mid: '#F5F5F5', // Light gray
-      end: '#EFEFEF', // Soft gray
-      accent: '#1A1A1F', // Dark text
+      start: '#F5F0EB', // Warm paper
+      mid: '#EDE5DD', // Soft beige
+      end: '#E5DBD0', // Warm taupe with purple hint
+      accent: '#6B5B95', // Muted purple
     },
     imagine: {
-      start: '#FAF5FF', // Soft violet
-      mid: '#F3E8FF', // Light purple
-      end: '#E9D5FF', // Pale violet
+      start: '#FAF5FB', // Cream with violet
+      mid: '#F3EAF5', // Soft lavender
+      end: '#EBDFF0', // Light purple
       accent: '#7C3AED', // Vivid purple
     },
   },
 
-  shadowColor: '#000000',
-  shadowOpacity: 0.1,
-  blurIntensity: 60,
+  shadowColor: '#2D2A26',
+  shadowOpacity: 0.08,
+  blurIntensity: 40,
 };
 
 export interface ThemeContextType {

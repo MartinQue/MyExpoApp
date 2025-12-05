@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Live2D Avatar</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #error-message {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 0, 0, 0.9);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 80%;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="error-message"></div>
+
+  <!-- Live2D Cubism Core -->
+  <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
+
+  <!-- PIXI.js for rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.3.2/dist/pixi.min.js"></script>
+
+  <!-- Live2D PIXI Plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.5.0/dist/index.min.js"></script>
+
+  <script>
+    // Global state
+    let app = null;
+    let model = null;
+    let currentExpression = 'idle';
+    let isSpeaking = false;
+    let lipSyncInterval = null;
+
+    // Available expressions
+    const EXPRESSIONS = {
+      idle: 0,
+      happy: 1,
+      thinking: 2,
+      listening: 3,
+      speaking: 4,
+      surprised: 5,
+      sad: 6
+    };
+
+    // Available models (built-in sample models)
+    const MODELS = {
+      hiyori: 'https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/hiyori/hiyori.model.json',
+      haru: 'https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json',
+      shizuku: 'https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/shizuku/shizuku.model.json',
+      mao: 'https://cdn.jsdelivr.net/gh/Eikanya/Live2d-model/mao_2.0/model.json',
+      hijiki: 'https://cdn.jsdelivr.net/gh/Eikanya/Live2d-model/hijiki/model.json',
+      tororo: 'https://cdn.jsdelivr.net/gh/Eikanya/Live2d-model/tororo/tororo.model.json'
+    };
+
+    // Initialize PIXI Application
+    function initPixi() {
+      console.log('🎨 Initializing PIXI...');
+
+      app = new PIXI.Application({
+        view: document.getElementById('canvas'),
+        autoStart: true,
+        resizeTo: window,
+        backgroundAlpha: 0,
+        antialias: true
+      });
+
+      console.log('✅ PIXI initialized');
+    }
+
+    // Load Live2D model
+    async function loadModel(modelName = 'hiyori') {
+      try {
+        console.log('🎭 Loading model:', modelName);
+
+        const modelUrl = MODELS[modelName];
+        if (!modelUrl) {
+          throw new Error(`Model not found: ${modelName}`);
+        }
+
+        // Remove existing model if any
+        if (model) {
+          app.stage.removeChild(model);
+          model.destroy();
+        }
+
+        // Load new model
+        model = await PIXI.live2d.Live2DModel.from(modelUrl, {
+          autoInteract: false
+        });
+
+        // Center model
+        model.anchor.set(0.5, 0.5);
+        model.position.set(app.screen.width / 2, app.screen.height / 2);
+
+        // Scale to fit
+        const scale = Math.min(
+          app.screen.width / model.width,
+          app.screen.height / model.height
+        ) * 0.8;
+        model.scale.set(scale);
+
+        app.stage.addChild(model);
+
+        console.log('✅ Model loaded:', modelName);
+
+        // Notify React Native
+        sendMessage({ type: 'modelLoaded', modelName });
+
+        return true;
+      } catch (error) {
+        console.error('❌ Model load error:', error);
+        showError(`Failed to load model: ${error.message}`);
+        sendMessage({ type: 'error', message: error.message });
+        return false;
+      }
+    }
+
+    // Set expression
+    function setExpression(expression) {
+      if (!model) {
+        console.warn('⚠️ No model loaded');
+        return;
+      }
+
+      currentExpression = expression;
+      console.log('😊 Setting expression:', expression);
+
+      try {
+        // Try to set expression by name (model3.json)
+        if (model.internalModel && model.internalModel.motionManager) {
+          const expressionIndex = EXPRESSIONS[expression] || 0;
+
+          // Different models have different expression systems
+          if (model.internalModel.motionManager.expressionManager) {
+            model.internalModel.motionManager.expressionManager.setExpression(expressionIndex);
+          }
+        }
+
+        // Trigger idle motion for the expression
+        if (model.motion) {
+          model.motion(expression, 0, PIXI.live2d.MotionPriority.NORMAL);
+        }
+
+        sendMessage({ type: 'expressionChanged', expression });
+      } catch (error) {
+        console.warn('⚠️ Expression error:', error);
+      }
+    }
+
+    // Start lip sync animation
+    function startLipSync() {
+      if (isSpeaking) return;
+
+      isSpeaking = true;
+      console.log('🗣️ Starting lip sync');
+
+      // Animate mouth opening/closing
+      lipSyncInterval = setInterval(() => {
+        if (!model || !isSpeaking) {
+          stopLipSync();
+          return;
+        }
+
+        try {
+          // Random mouth opening (0.0 to 1.0)
+          const mouthOpen = Math.random() * 0.8 + 0.2;
+
+          // Set mouth parameter if available
+          if (model.internalModel && model.internalModel.coreModel) {
+            const coreModel = model.internalModel.coreModel;
+
+            // Try common mouth parameter names
+            const mouthParams = ['ParamMouthOpenY', 'PARAM_MOUTH_OPEN_Y', 'MouthOpenY'];
+            for (const param of mouthParams) {
+              const index = coreModel.getParameterIndex(param);
+              if (index >= 0) {
+                coreModel.setParameterValueById(param, mouthOpen);
+                break;
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Lip sync error:', error);
+        }
+      }, 100); // Update every 100ms
+
+      sendMessage({ type: 'lipSyncStarted' });
+    }
+
+    // Stop lip sync animation
+    function stopLipSync() {
+      if (!isSpeaking) return;
+
+      isSpeaking = false;
+      console.log('🤐 Stopping lip sync');
+
+      if (lipSyncInterval) {
+        clearInterval(lipSyncInterval);
+        lipSyncInterval = null;
+      }
+
+      // Close mouth
+      try {
+        if (model && model.internalModel && model.internalModel.coreModel) {
+          const coreModel = model.internalModel.coreModel;
+          const mouthParams = ['ParamMouthOpenY', 'PARAM_MOUTH_OPEN_Y', 'MouthOpenY'];
+          for (const param of mouthParams) {
+            const index = coreModel.getParameterIndex(param);
+            if (index >= 0) {
+              coreModel.setParameterValueById(param, 0);
+              break;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Mouth close error:', error);
+      }
+
+      sendMessage({ type: 'lipSyncStopped' });
+    }
+
+    // Handle window resize
+    function handleResize() {
+      if (!model || !app) return;
+
+      model.position.set(app.screen.width / 2, app.screen.height / 2);
+
+      const scale = Math.min(
+        app.screen.width / model.width,
+        app.screen.height / model.height
+      ) * 0.8;
+      model.scale.set(scale);
+    }
+
+    // Send message to React Native
+    function sendMessage(data) {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify(data));
+      } else {
+        console.log('📤 Message to RN:', data);
+      }
+    }
+
+    // Show error message
+    function showError(message) {
+      const errorDiv = document.getElementById('error-message');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+
+      setTimeout(() => {
+        errorDiv.style.display = 'none';
+      }, 5000);
+    }
+
+    // Handle messages from React Native
+    window.addEventListener('message', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('📥 Message from RN:', data);
+
+        switch (data.type) {
+          case 'loadModel':
+            loadModel(data.modelName);
+            break;
+
+          case 'setExpression':
+            setExpression(data.expression);
+            break;
+
+          case 'startLipSync':
+            startLipSync();
+            break;
+
+          case 'stopLipSync':
+            stopLipSync();
+            break;
+
+          case 'getModels':
+            sendMessage({ type: 'modelList', models: Object.keys(MODELS) });
+            break;
+
+          default:
+            console.warn('⚠️ Unknown message type:', data.type);
+        }
+      } catch (error) {
+        console.error('❌ Message handler error:', error);
+      }
+    });
+
+    // Initialize on load
+    window.addEventListener('load', async () => {
+      try {
+        console.log('🚀 Live2D WebView initializing...');
+
+        initPixi();
+        await loadModel('hiyori'); // Load default model
+
+        window.addEventListener('resize', handleResize);
+
+        console.log('✅ Live2D WebView ready');
+        sendMessage({ type: 'ready' });
+      } catch (error) {
+        console.error('❌ Initialization error:', error);
+        showError(`Initialization failed: ${error.message}`);
+        sendMessage({ type: 'error', message: error.message });
+      }
+    });
+  </script>
+</body>
+</html>
