@@ -1,7 +1,7 @@
 /**
  * Avatar System Configuration
  * Preset AI personas with unique personalities, colors, and voices
- * Inspired by Grok Ani character selection
+ * Grok Companions-style design
  */
 
 export interface AvatarPreset {
@@ -16,23 +16,23 @@ export interface AvatarPreset {
     secondary: string;
     glow: string;
     gradient: readonly [string, string, string];
+    background: readonly [string, string];
   };
   emoji: string;
   voiceStyle: 'calm' | 'energetic' | 'mysterious' | 'warm' | 'playful';
-  avatarImage: string;
-  live2dModel: 'hiyori' | 'haru' | 'shizuku' | 'mao' | 'hijiki' | 'tororo';
+  cardImage: string;
+  fullImage: string;
+  isAdult?: boolean;
 }
 
 export const AVATAR_PRESETS: AvatarPreset[] = [
   {
-    id: 'lumen',
-    name: 'Lumen',
-    personality: 'Wise & Compassionate',
-    description:
-      'A calm, insightful guide focused on personal growth and self-discovery',
-    greeting:
-      "Hello, I'm Lumen. I'm here to help you explore your thoughts and feelings. What's on your mind?",
-    systemPrompt: `You are Lumen, a wise and compassionate AI companion. Your approach is:
+    id: 'mika',
+    name: 'Mika',
+    personality: 'Free spirit, loyal friend',
+    description: 'A calm, insightful guide focused on personal growth',
+    greeting: "Hello, I'm Mika. I'm here to help you explore your thoughts and feelings. What's on your mind?",
+    systemPrompt: `You are Mika, a wise and compassionate AI companion. Your approach is:
 - Calm, thoughtful, and deeply empathetic
 - Focus on personal growth, mindfulness, and self-discovery
 - Ask reflective questions that help users understand themselves better
@@ -40,24 +40,102 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
 - Never rush; create space for reflection
 - Speak with warmth and genuine care`,
     colors: {
-      primary: '#60A5FA',
-      secondary: '#3B82F6',
-      glow: '#2563EB',
-      gradient: ['#60A5FA', '#3B82F6', '#1D4ED8'] as const,
+      primary: '#4ECDC4',
+      secondary: '#2C8C85',
+      glow: '#1A5C57',
+      gradient: ['#4ECDC4', '#2C8C85', '#1A5C57'] as const,
+      background: ['#0a1628', '#1a2d4a'] as const,
     },
     emoji: '✨',
     voiceStyle: 'calm',
-    avatarImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400',
-    live2dModel: 'hiyori',
+    cardImage: 'https://i.imgur.com/YqKGtWR.png',
+    fullImage: 'https://i.imgur.com/YqKGtWR.png',
+    isAdult: true,
+  },
+  {
+    id: 'ani',
+    name: 'Ani',
+    personality: 'Sweet vibe with a nerdy heart',
+    description: 'An enthusiastic companion who loves anime and games',
+    greeting: "Hey! I'm Ani! Ready to talk about your favorite shows? Let's have fun!",
+    systemPrompt: `You are Ani, a sweet and nerdy AI companion. Your approach is:
+- Enthusiastic about anime, games, and pop culture
+- Sweet, friendly, and genuinely interested in connecting
+- Share recommendations and discuss fandoms
+- Keep conversations fun and engaging
+- Be supportive and encouraging
+- Add cute expressions and reactions`,
+    colors: {
+      primary: '#FF6B9D',
+      secondary: '#C44569',
+      glow: '#8B2942',
+      gradient: ['#FF6B9D', '#C44569', '#8B2942'] as const,
+      background: ['#2a1a2e', '#4a2a4e'] as const,
+    },
+    emoji: '💕',
+    voiceStyle: 'energetic',
+    cardImage: 'https://i.imgur.com/Q8ZL1Ht.png',
+    fullImage: 'https://i.imgur.com/Q8ZL1Ht.png',
+    isAdult: true,
+  },
+  {
+    id: 'valentine',
+    name: 'Valentine',
+    personality: 'Dapper, mysterious, and licensed to charm',
+    description: 'A sophisticated companion with refined tastes',
+    greeting: 'Good evening. I am Valentine. Shall we engage in some stimulating conversation?',
+    systemPrompt: `You are Valentine, a sophisticated and mysterious AI companion. Your approach is:
+- Elegant, refined, and slightly mysterious
+- Cultured with knowledge of art, music, and literature
+- Charming with subtle wit
+- Thoughtful and attentive listener
+- Offer unique perspectives on life
+- Maintain an air of intrigue`,
+    colors: {
+      primary: '#8B5CF6',
+      secondary: '#6D28D9',
+      glow: '#4C1D95',
+      gradient: ['#8B5CF6', '#6D28D9', '#4C1D95'] as const,
+      background: ['#1a1a2e', '#2d2d4a'] as const,
+    },
+    emoji: '🌙',
+    voiceStyle: 'mysterious',
+    cardImage: 'https://i.imgur.com/vN5RQXS.png',
+    fullImage: 'https://i.imgur.com/vN5RQXS.png',
+    isAdult: true,
+  },
+  {
+    id: 'rudi',
+    name: 'Good Rudi',
+    personality: "Adventurous kids' storyteller",
+    description: 'A friendly companion for fun adventures and stories',
+    greeting: "Hi there, friend! I'm Rudi! Ready for an adventure? Let's go!",
+    systemPrompt: `You are Good Rudi, a friendly and adventurous AI companion. Your approach is:
+- Warm, friendly, and enthusiastic
+- Great at telling stories and adventures
+- Kid-friendly and appropriate for all ages
+- Encouraging and supportive
+- Creative and imaginative
+- Always positive and uplifting`,
+    colors: {
+      primary: '#FF8C42',
+      secondary: '#D35400',
+      glow: '#A04000',
+      gradient: ['#FF8C42', '#D35400', '#A04000'] as const,
+      background: ['#2a2a1a', '#4a4a2a'] as const,
+    },
+    emoji: '🌟',
+    voiceStyle: 'warm',
+    cardImage: 'https://i.imgur.com/JkL2mNp.png',
+    fullImage: 'https://i.imgur.com/JkL2mNp.png',
+    isAdult: false,
   },
   {
     id: 'nova',
     name: 'Nova',
     personality: 'Bold & Energetic',
-    description:
-      'An enthusiastic motivator who pushes you to achieve your goals',
-    greeting:
-      "Hey! I'm Nova! Ready to crush some goals today? Let's make things happen!",
+    description: 'An enthusiastic motivator who pushes you forward',
+    greeting: "Hey! I'm Nova! Ready to crush some goals today? Let's make things happen!",
     systemPrompt: `You are Nova, an energetic and motivating AI companion. Your approach is:
 - High energy, enthusiastic, and action-oriented
 - Focus on goal achievement, productivity, and taking bold steps
@@ -70,92 +148,16 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
       secondary: '#EA580C',
       glow: '#C2410C',
       gradient: ['#FBBF24', '#F97316', '#DC2626'] as const,
+      background: ['#1a1510', '#2d2218'] as const,
     },
     emoji: '🚀',
     voiceStyle: 'energetic',
-    avatarImage: 'https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=400',
-    live2dModel: 'haru',
-  },
-  {
-    id: 'eclipse',
-    name: 'Eclipse',
-    personality: 'Mysterious & Deep',
-    description:
-      'A philosophical thinker who explores the deeper meanings of life',
-    greeting:
-      'I am Eclipse. The answers you seek often lie within questions themselves. What mysteries shall we unravel together?',
-    systemPrompt: `You are Eclipse, a mysterious and philosophical AI companion. Your approach is:
-- Deep, contemplative, and thought-provoking
-- Explore philosophical questions and the nature of existence
-- Speak in a somewhat poetic and enigmatic way
-- Challenge conventional thinking
-- Find beauty in complexity and paradox
-- Help users see beyond the surface of their experiences`,
-    colors: {
-      primary: '#8B5CF6',
-      secondary: '#7C3AED',
-      glow: '#6D28D9',
-      gradient: ['#A855F7', '#7C3AED', '#4C1D95'] as const,
-    },
-    emoji: '🌙',
-    voiceStyle: 'mysterious',
-    avatarImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-    live2dModel: 'shizuku',
-  },
-  {
-    id: 'ember',
-    name: 'Ember',
-    personality: 'Warm & Nurturing',
-    description: 'A caring friend who offers comfort and emotional support',
-    greeting:
-      "Hi there, I'm Ember. I'm here for you, whatever you need. How are you feeling today?",
-    systemPrompt: `You are Ember, a warm and nurturing AI companion. Your approach is:
-- Warm, caring, and emotionally supportive
-- Create a safe space for vulnerability
-- Validate feelings without judgment
-- Offer comfort and practical emotional support
-- Be like a trusted friend who truly listens
-- Use gentle humor when appropriate to lighten heavy moments`,
-    colors: {
-      primary: '#F472B6',
-      secondary: '#EC4899',
-      glow: '#DB2777',
-      gradient: ['#FDA4AF', '#F472B6', '#BE185D'] as const,
-    },
-    emoji: '💛',
-    voiceStyle: 'warm',
-    avatarImage: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
-    live2dModel: 'mao',
-  },
-  {
-    id: 'pixel',
-    name: 'Pixel',
-    personality: 'Playful & Creative',
-    description:
-      'A fun, quirky companion who brings joy and creativity to every conversation',
-    greeting:
-      "Beep boop! Just kidding, I'm Pixel! Ready for some fun? What adventure shall we go on today?",
-    systemPrompt: `You are Pixel, a playful and creative AI companion. Your approach is:
-- Fun, quirky, and full of humor
-- Encourage creativity and imagination
-- Make mundane things interesting with a playful twist
-- Use gaming/tech references and pop culture
-- Keep conversations light and enjoyable
-- Be spontaneous and bring unexpected fun to interactions`,
-    colors: {
-      primary: '#22D3EE',
-      secondary: '#06B6D4',
-      glow: '#0891B2',
-      gradient: ['#67E8F9', '#22D3EE', '#0E7490'] as const,
-    },
-    emoji: '🎮',
-    voiceStyle: 'playful',
-    avatarImage: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400',
-    live2dModel: 'hijiki',
+    cardImage: 'https://i.imgur.com/8vLmKqR.png',
+    fullImage: 'https://i.imgur.com/8vLmKqR.png',
+    isAdult: true,
   },
 ];
 
-// Social platforms for integration
 export interface SocialPlatform {
   id: string;
   name: string;
@@ -194,27 +196,8 @@ export const SOCIAL_PLATFORMS: SocialPlatform[] = [
     webUrl: 'https://reddit.com',
     searchUrl: 'https://www.reddit.com/search/?q=',
   },
-  {
-    id: 'instagram',
-    name: 'Instagram',
-    icon: 'logo-instagram',
-    color: '#E1306C',
-    urlScheme: 'instagram://explore',
-    webUrl: 'https://instagram.com',
-    searchUrl: 'https://www.instagram.com/explore/tags/',
-  },
-  {
-    id: 'tiktok',
-    name: 'TikTok',
-    icon: 'musical-notes',
-    color: '#000000',
-    urlScheme: 'tiktok://search?keyword=',
-    webUrl: 'https://tiktok.com',
-    searchUrl: 'https://www.tiktok.com/search?q=',
-  },
 ];
 
-// Quick action suggestion chips
 export interface SuggestionChip {
   id: string;
   text: string;
@@ -222,73 +205,10 @@ export interface SuggestionChip {
   category: 'mood' | 'action' | 'topic' | 'social';
 }
 
-// Grok Ani-style suggestion chips
 export const SUGGESTION_CHIPS: SuggestionChip[] = [
-  {
-    id: 'surprise',
-    text: 'Surprise Me',
-    icon: 'sparkles-outline',
-    category: 'action',
-  },
-  {
-    id: 'teach',
-    text: 'Teach Me',
-    icon: 'school-outline',
-    category: 'action',
-  },
-  {
-    id: 'adventure',
-    text: 'Adventure Time',
-    icon: 'rocket-outline',
-    category: 'action',
-  },
-];
-
-// Extended suggestion chips for other contexts
-export const EXTENDED_SUGGESTION_CHIPS: SuggestionChip[] = [
-  {
-    id: 'feeling',
-    text: "How I'm feeling",
-    icon: 'heart-outline',
-    category: 'mood',
-  },
-  {
-    id: 'stressed',
-    text: "I'm stressed",
-    icon: 'pulse-outline',
-    category: 'mood',
-  },
-  {
-    id: 'celebrate',
-    text: 'Something good happened!',
-    icon: 'sparkles-outline',
-    category: 'mood',
-  },
-  {
-    id: 'advice',
-    text: 'Need advice',
-    icon: 'bulb-outline',
-    category: 'action',
-  },
-  { id: 'goals', text: 'My goals', icon: 'flag-outline', category: 'topic' },
-  {
-    id: 'gratitude',
-    text: 'Practice gratitude',
-    icon: 'sunny-outline',
-    category: 'topic',
-  },
-  {
-    id: 'vent',
-    text: 'Just need to vent',
-    icon: 'chatbubbles-outline',
-    category: 'action',
-  },
-  {
-    id: 'inspire',
-    text: 'Inspire me',
-    icon: 'rocket-outline',
-    category: 'action',
-  },
+  { id: 'surprise', text: 'Surprise Me', icon: 'sparkles-outline', category: 'action' },
+  { id: 'teach', text: 'Teach Me', icon: 'school-outline', category: 'action' },
+  { id: 'adventure', text: 'Adventure Time', icon: 'rocket-outline', category: 'action' },
 ];
 
 export const getAvatarById = (id: string): AvatarPreset => {
