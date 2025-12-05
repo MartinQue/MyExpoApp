@@ -47,7 +47,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
     emoji: '✨',
     voiceStyle: 'calm',
-    avatarImage: 'https://i.imgur.com/YQsY8Zl.png',
+    avatarImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400',
     live2dModel: 'hiyori',
   },
   {
@@ -73,7 +73,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
     emoji: '🚀',
     voiceStyle: 'energetic',
-    avatarImage: 'https://i.imgur.com/Kq3YXZQ.png',
+    avatarImage: 'https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=400',
     live2dModel: 'haru',
   },
   {
@@ -99,7 +99,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
     emoji: '🌙',
     voiceStyle: 'mysterious',
-    avatarImage: 'https://i.imgur.com/3YJsGwB.png',
+    avatarImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
     live2dModel: 'shizuku',
   },
   {
@@ -124,7 +124,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
     emoji: '💛',
     voiceStyle: 'warm',
-    avatarImage: 'https://i.imgur.com/Wq5kHZL.png',
+    avatarImage: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
     live2dModel: 'mao',
   },
   {
@@ -150,7 +150,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
     emoji: '🎮',
     voiceStyle: 'playful',
-    avatarImage: 'https://i.imgur.com/LZsPqNt.png',
+    avatarImage: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400',
     live2dModel: 'hijiki',
   },
 ];

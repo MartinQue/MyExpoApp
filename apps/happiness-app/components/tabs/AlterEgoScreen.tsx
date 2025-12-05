@@ -14,6 +14,7 @@ import {
   TouchableWithoutFeedback,
   Image,
   ScrollView,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -575,109 +576,116 @@ export function AlterEgoScreen() {
           <Animated.View style={[styles.backgroundBlob2, orbAnimatedStyle]} />
         </>
       )}
-      <View style={styles.chatContent}>
-        <View style={styles.chatHeader}>
-          <Pressable
-            style={[styles.backButton, { backgroundColor: glassBg }]}
-            onPress={() => {
-              if (hapticEnabled) haptics.selection();
-              setMode('grid');
-            }}
-          >
-            <Ionicons name="chevron-back" size={22} color={textColor} />
-          </Pressable>
-          <View style={styles.chatHeaderInfo}>
-            <Text style={[styles.chatHeaderName, { color: textColor }]}>
-              {avatarCustomNames[selectedAvatar.id] || selectedAvatar.name}
-            </Text>
-            <Text style={[styles.chatHeaderStatus, { color: selectedAvatar.colors.primary }]}>
-              {avatarState === 'speaking' ? 'Speaking...' : avatarState === 'listening' ? 'Listening...' : 'Online'}
-            </Text>
-          </View>
-          <Pressable
-            style={[styles.muteButton, { backgroundColor: glassBg }]}
-            onPress={() => setIsMuted(!isMuted)}
-          >
-            <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={20} color={textColor} />
-          </Pressable>
-        </View>
-        <View style={styles.avatarWrapper}>
-          <AvatarController
-            model={selectedAvatar.live2dModel}
-            state={avatarState}
-            isSpeaking={isElevenLabsSpeaking}
-            onReady={() => {}}
-            onError={() => {}}
-            style={styles.avatar}
-          />
-        </View>
-        {messages.length > 1 && (
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item._id.toString()}
-            contentContainerStyle={styles.messagesList}
-            showsVerticalScrollIndicator={false}
-            onContentSizeChange={scrollToBottom}
-            style={styles.messagesContainer}
-          />
-        )}
-        <View style={styles.bottomSection}>
-          {messages.length <= 1 && (
-            <Animated.View entering={SlideInUp.delay(300).duration(400)} style={styles.suggestionsRow}>
-              {SUGGESTION_CHIPS.map((chip) => (
-                <Pressable
-                  key={chip.id}
-                  style={[styles.suggestionChip, { backgroundColor: glassBg, borderColor: glassBorder }]}
-                  onPress={() => handleSend(chip.text)}
-                >
-                  <Text style={[styles.suggestionText, { color: subtleTextColor }]}>{chip.text}</Text>
-                </Pressable>
-              ))}
-            </Animated.View>
-          )}
-          <View style={[styles.inputBar, { backgroundColor: glassBg, borderColor: glassBorder }]}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoiding}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <View style={styles.chatContent}>
+          <View style={styles.chatHeader}>
             <Pressable
-              style={[styles.inputIconButton, { backgroundColor: glassBg }, isListening && styles.inputIconButtonActive]}
-              onPress={handleVoicePress}
+              style={[styles.backButton, { backgroundColor: glassBg }]}
+              onPress={() => {
+                if (hapticEnabled) haptics.selection();
+                setMode('grid');
+              }}
             >
-              <Ionicons name={isListening ? 'mic' : 'mic-outline'} size={22} color={isListening ? colors.primary : subtleTextColor} />
+              <Ionicons name="chevron-back" size={22} color={textColor} />
             </Pressable>
-            <View style={styles.textInputContainer}>
-              <TextInput
-                ref={inputRef}
-                style={[styles.textInput, { color: textColor }]}
-                placeholder="Ask Anything"
-                placeholderTextColor={subtleTextColor}
-                value={inputText}
-                onChangeText={setInputText}
-                onSubmitEditing={() => handleSend(inputText)}
-                returnKeyType="send"
-              />
+            <View style={styles.chatHeaderInfo}>
+              <Text style={[styles.chatHeaderName, { color: textColor }]}>
+                {avatarCustomNames[selectedAvatar.id] || selectedAvatar.name}
+              </Text>
+              <Text style={[styles.chatHeaderStatus, { color: selectedAvatar.colors.primary }]}>
+                {avatarState === 'speaking' ? 'Speaking...' : avatarState === 'listening' ? 'Listening...' : 'Online'}
+              </Text>
             </View>
             <Pressable
-              style={[
-                styles.chatButton,
-                { backgroundColor: inputText.trim() ? selectedAvatar.colors.primary : (isDark ? '#ffffff' : colors.primary) },
-              ]}
-              onPress={() => inputText.trim() ? handleSend(inputText) : inputRef.current?.focus()}
+              style={[styles.muteButton, { backgroundColor: glassBg }]}
+              onPress={() => setIsMuted(!isMuted)}
             >
-              <Ionicons
-                name={inputText.trim() ? 'send' : 'chatbubble-outline'}
-                size={18}
-                color={inputText.trim() ? '#ffffff' : (isDark ? '#000000' : '#ffffff')}
-              />
+              <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={20} color={textColor} />
             </Pressable>
           </View>
+          <View style={styles.avatarWrapper}>
+            <AvatarController
+              model={selectedAvatar.live2dModel}
+              state={avatarState}
+              isSpeaking={isElevenLabsSpeaking}
+              onReady={() => {}}
+              onError={() => {}}
+              style={styles.avatar}
+            />
+          </View>
+          {messages.length > 1 && (
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              renderItem={renderMessage}
+              keyExtractor={(item) => item._id.toString()}
+              contentContainerStyle={styles.messagesList}
+              showsVerticalScrollIndicator={false}
+              onContentSizeChange={scrollToBottom}
+              style={styles.messagesContainer}
+            />
+          )}
+          <View style={styles.bottomSection}>
+            {messages.length <= 1 && (
+              <Animated.View entering={SlideInUp.delay(300).duration(400)} style={styles.suggestionsRow}>
+                {SUGGESTION_CHIPS.map((chip) => (
+                  <Pressable
+                    key={chip.id}
+                    style={[styles.suggestionChip, { backgroundColor: glassBg, borderColor: glassBorder }]}
+                    onPress={() => handleSend(chip.text)}
+                  >
+                    <Text style={[styles.suggestionText, { color: subtleTextColor }]}>{chip.text}</Text>
+                  </Pressable>
+                ))}
+              </Animated.View>
+            )}
+            <View style={[styles.inputBar, { backgroundColor: glassBg, borderColor: glassBorder }]}>
+              <Pressable
+                style={[styles.inputIconButton, { backgroundColor: glassBg }, isListening && styles.inputIconButtonActive]}
+                onPress={handleVoicePress}
+              >
+                <Ionicons name={isListening ? 'mic' : 'mic-outline'} size={22} color={isListening ? colors.primary : subtleTextColor} />
+              </Pressable>
+              <View style={styles.textInputContainer}>
+                <TextInput
+                  ref={inputRef}
+                  style={[styles.textInput, { color: textColor }]}
+                  placeholder="Ask Anything"
+                  placeholderTextColor={subtleTextColor}
+                  value={inputText}
+                  onChangeText={setInputText}
+                  onSubmitEditing={() => handleSend(inputText)}
+                  returnKeyType="send"
+                />
+              </View>
+              <Pressable
+                style={[
+                  styles.chatButton,
+                  { backgroundColor: inputText.trim() ? selectedAvatar.colors.primary : (isDark ? '#ffffff' : colors.primary) },
+                ]}
+                onPress={() => inputText.trim() ? handleSend(inputText) : inputRef.current?.focus()}
+              >
+                <Ionicons
+                  name={inputText.trim() ? 'send' : 'chatbubble-outline'}
+                  size={18}
+                  color={inputText.trim() ? '#ffffff' : (isDark ? '#000000' : '#ffffff')}
+                />
+              </Pressable>
+            </View>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  keyboardAvoiding: { flex: 1 },
   gridContent: {
     flex: 1,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
