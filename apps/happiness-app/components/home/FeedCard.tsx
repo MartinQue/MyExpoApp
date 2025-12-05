@@ -86,14 +86,14 @@ export function FeedCard({
       >
         {/* Graph Image */}
         {card.details.graphImage && (
-          <View style={styles.graphContainer}>
+          <View style={[styles.graphContainer, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.1)' }]}>
             <Image
               source={{ uri: card.details.graphImage }}
               style={styles.graphImage}
               resizeMode="cover"
             />
             <View style={styles.graphOverlay}>
-              <Text style={styles.graphLabel}>Live Market Data</Text>
+              <Text style={[styles.graphLabel, { color: colors.primary }]}>Live Market Data</Text>
             </View>
           </View>
         )}
@@ -101,19 +101,19 @@ export function FeedCard({
         {/* Must Know Section */}
         {card.details.mustKnow && (
           <View style={styles.detailSection}>
-            <Text style={styles.detailLabel}>WHAT YOU MUST KNOW</Text>
-            <Text style={styles.detailText}>{card.details.mustKnow}</Text>
+            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>WHAT YOU MUST KNOW</Text>
+            <Text style={[styles.detailText, { color: colors.textSecondary }]}>{card.details.mustKnow}</Text>
           </View>
         )}
 
         {/* Trending Topics */}
         {card.details.trending && (
           <View style={styles.detailSection}>
-            <Text style={styles.detailLabel}>TRENDING & INVESTED</Text>
+            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>TRENDING & INVESTED</Text>
             <View style={styles.trendingRow}>
               {card.details.trending.map((item, idx) => (
-                <View key={idx} style={styles.trendingChip}>
-                  <Text style={styles.trendingTopic}>{item.topic}</Text>
+                <View key={idx} style={[styles.trendingChip, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
+                  <Text style={[styles.trendingTopic, { color: colors.text }]}>{item.topic}</Text>
                   <Text style={[styles.trendingChange, { color: item.color }]}>
                     {item.change}
                   </Text>
@@ -126,15 +126,15 @@ export function FeedCard({
         {/* Expert Advice */}
         {card.details.expertAdvice && (
           <View style={styles.detailSection}>
-            <Text style={styles.detailLabel}>EXPERT PREDICTION</Text>
-            <View style={styles.expertBox}>
+            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>EXPERT PREDICTION</Text>
+            <View style={[styles.expertBox, { backgroundColor: `${colors.primary}15`, borderColor: `${colors.primary}30` }]}>
               <Ionicons
                 name="analytics"
                 size={16}
-                color={Colors.primary[300]}
+                color={colors.primary}
                 style={{ marginRight: 8 }}
               />
-              <Text style={styles.expertText}>{card.details.expertAdvice}</Text>
+              <Text style={[styles.expertText, { color: colors.textSecondary }]}>{card.details.expertAdvice}</Text>
             </View>
           </View>
         )}
@@ -151,11 +151,11 @@ export function FeedCard({
                   Linking.openURL(link.url).catch(() => {});
                 }}
               >
-                <Text style={styles.linkText}>{link.label}</Text>
+                <Text style={[styles.linkText, { color: colors.primary }]}>{link.label}</Text>
                 <Ionicons
                   name="open-outline"
                   size={12}
-                  color={Colors.primary[300]}
+                  color={colors.primary}
                 />
               </Pressable>
             ))}
@@ -180,8 +180,8 @@ export function FeedCard({
         {/* Why You Started */}
         {card.details.whyStarted && (
           <View style={styles.detailSection}>
-            <Text style={styles.detailLabel}>REMEMBER WHY YOU STARTED</Text>
-            <Text style={styles.memoireText}>
+            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>REMEMBER WHY YOU STARTED</Text>
+            <Text style={[styles.memoireText, { color: colors.text }]}>
               &quot;{card.details.whyStarted}&quot;
             </Text>
           </View>
@@ -190,7 +190,7 @@ export function FeedCard({
         {/* Before / Goal Comparison */}
         {card.details.comparison && (
           <View style={styles.comparisonContainer}>
-            <View style={styles.comparisonItem}>
+            <View style={[styles.comparisonItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
               <Image
                 source={{ uri: card.details.comparison.before }}
                 style={styles.comparisonImage}
@@ -201,15 +201,15 @@ export function FeedCard({
               <Ionicons
                 name="arrow-forward"
                 size={20}
-                color={Colors.gray[400]}
+                color={colors.textMuted}
               />
             </View>
-            <View style={styles.comparisonItem}>
+            <View style={[styles.comparisonItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
               <Image
                 source={{ uri: card.details.comparison.goal }}
                 style={styles.comparisonImage}
               />
-              <View style={styles.aiBadge}>
+              <View style={[styles.aiBadge, { backgroundColor: colors.primary }]}>
                 <Text style={styles.aiBadgeText}>AI GOAL</Text>
               </View>
               <Text style={styles.comparisonLabel}>Target</Text>
@@ -240,11 +240,11 @@ export function FeedCard({
         {/* Today's Routine */}
         {card.details.todayRoutine && (
           <View style={styles.detailSection}>
-            <Text style={styles.detailLabel}>TODAY&apos;S ROUTINE</Text>
+            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>TODAY&apos;S ROUTINE</Text>
             {card.details.todayRoutine.map((item, idx) => (
               <View key={idx} style={styles.routineItem}>
-                <View style={styles.routineCheckbox} />
-                <Text style={styles.routineText}>{item}</Text>
+                <View style={[styles.routineCheckbox, { borderColor: colors.textMuted }]} />
+                <Text style={[styles.routineText, { color: colors.textSecondary }]}>{item}</Text>
               </View>
             ))}
           </View>
@@ -268,7 +268,7 @@ export function FeedCard({
         {/* Suggested Actions */}
         {card.details.suggestedActions && (
           <View style={styles.detailSection}>
-            <Text style={styles.detailLabel}>SUGGESTED ACTIONS</Text>
+            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>SUGGESTED ACTIONS</Text>
             {card.details.suggestedActions.map((action, idx) => (
               <Pressable
                 key={idx}
@@ -278,9 +278,9 @@ export function FeedCard({
                 <Ionicons
                   name="arrow-forward-circle"
                   size={18}
-                  color={Colors.primary[400]}
+                  color={colors.primary}
                 />
-                <Text style={styles.actionText}>{action}</Text>
+                <Text style={[styles.actionText, { color: colors.textSecondary }]}>{action}</Text>
               </Pressable>
             ))}
           </View>
@@ -289,12 +289,12 @@ export function FeedCard({
         {/* Related Goals */}
         {card.details.relatedGoals && card.details.relatedGoals.length > 0 && (
           <View style={styles.detailSection}>
-            <Text style={styles.detailLabel}>RELATED TO YOUR GOALS</Text>
+            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>RELATED TO YOUR GOALS</Text>
             <View style={styles.goalsRow}>
               {card.details.relatedGoals.map((goal, idx) => (
-                <View key={idx} style={styles.goalChip}>
-                  <Ionicons name="flag" size={12} color={Colors.primary[300]} />
-                  <Text style={styles.goalText}>{goal}</Text>
+                <View key={idx} style={[styles.goalChip, { backgroundColor: `${colors.primary}15` }]}>
+                  <Ionicons name="flag" size={12} color={colors.primary} />
+                  <Text style={[styles.goalText, { color: colors.text }]}>{goal}</Text>
                 </View>
               ))}
             </View>
@@ -303,10 +303,9 @@ export function FeedCard({
 
         {/* Reflection Input Prompt */}
         <Pressable
-          style={styles.reflectButton}
+          style={[styles.reflectButton, { backgroundColor: colors.primary }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            // Would open journal or reflection modal
           }}
         >
           <Ionicons name="pencil" size={16} color="white" />
@@ -329,12 +328,12 @@ export function FeedCard({
         style={styles.detailsContainer}
       >
         <View style={styles.detailSection}>
-          <Text style={styles.detailLabel}>QUICK WELLNESS ACTIONS</Text>
+          <Text style={[styles.detailLabel, { color: colors.textMuted }]}>QUICK WELLNESS ACTIONS</Text>
           <View style={styles.wellnessGrid}>
             {card.details.suggestedActions.map((action, idx) => (
               <Pressable
                 key={idx}
-                style={styles.wellnessAction}
+                style={[styles.wellnessAction, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
                 onPress={() => Haptics.selectionAsync()}
               >
                 <Ionicons
@@ -348,9 +347,9 @@ export function FeedCard({
                       : 'sunny'
                   }
                   size={20}
-                  color={Colors.primary[400]}
+                  color={colors.primary}
                 />
-                <Text style={styles.wellnessActionText}>{action}</Text>
+                <Text style={[styles.wellnessActionText, { color: colors.text }]}>{action}</Text>
               </Pressable>
             ))}
           </View>
@@ -840,13 +839,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   detailLabel: {
-    color: Colors.gray[500],
     fontSize: 10,
     fontWeight: 'bold',
     letterSpacing: 1,
   },
   detailText: {
-    color: Colors.gray[200],
     fontSize: 14,
     lineHeight: 20,
   },
@@ -857,7 +854,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 8,
-    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   graphImage: {
     width: '100%',
@@ -874,7 +870,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   graphLabel: {
-    color: Colors.primary[300],
     fontSize: 10,
     fontWeight: 'bold',
   },
@@ -884,7 +879,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   trendingChip: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -893,7 +887,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   trendingTopic: {
-    color: Colors.gray[300],
     fontSize: 13,
     fontWeight: '600',
   },
@@ -904,14 +897,11 @@ const styles = StyleSheet.create({
   expertBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: 'rgba(100, 80, 255, 0.1)',
     padding: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(100, 80, 255, 0.2)',
   },
   expertText: {
-    color: Colors.gray[200],
     fontSize: 13,
     fontStyle: 'italic',
     flex: 1,
@@ -929,14 +919,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   linkText: {
-    color: Colors.primary[300],
     fontSize: 12,
     fontWeight: '600',
   },
 
   // Fitness specific
   memoireText: {
-    color: Colors.white,
     fontSize: 16,
     fontStyle: 'italic',
     textAlign: 'center',
@@ -954,9 +942,7 @@ const styles = StyleSheet.create({
     aspectRatio: 3 / 4,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
     position: 'relative',
   },
   comparisonImage: {
@@ -969,7 +955,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     textAlign: 'center',
-    color: Colors.white,
+    color: '#ffffff',
     fontSize: 12,
     fontWeight: 'bold',
     textShadowColor: 'rgba(0,0,0,0.8)',
@@ -984,7 +970,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: Colors.primary[500],
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 4,
@@ -1044,17 +1029,15 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: 'rgba(128,128,128,0.1)',
   },
   routineCheckbox: {
     width: 20,
     height: 20,
     borderRadius: 4,
     borderWidth: 2,
-    borderColor: Colors.primary[400],
   },
   routineText: {
-    color: Colors.gray[300],
     fontSize: 14,
     flex: 1,
   },
@@ -1066,10 +1049,9 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: 'rgba(128,128,128,0.1)',
   },
   actionText: {
-    color: Colors.gray[200],
     fontSize: 14,
     flex: 1,
   },
@@ -1082,15 +1064,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
   },
   goalText: {
-    color: Colors.primary[300],
     fontSize: 12,
     fontWeight: '500',
   },
@@ -1099,7 +1077,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: Colors.primary[500],
     paddingVertical: 14,
     borderRadius: 12,
     marginTop: 8,
@@ -1118,16 +1095,12 @@ const styles = StyleSheet.create({
   },
   wellnessAction: {
     width: '48%',
-    backgroundColor: 'rgba(244, 114, 182, 0.1)',
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',
     gap: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(244, 114, 182, 0.2)',
   },
   wellnessActionText: {
-    color: Colors.gray[300],
     fontSize: 12,
     textAlign: 'center',
   },
