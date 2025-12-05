@@ -13,6 +13,6 @@ export { default as Live2DAvatar } from './Live2DAvatar';
 export type { Live2DAvatarRef, Live2DExpression, Live2DModel } from './Live2DAvatar';
 
 export { default as AvatarController } from './AvatarController';
-export type { AvatarState } from './AvatarController';
+export type { AvatarState, AvatarControllerRef } from './AvatarController';
 
 export { default as AvatarSelector } from './AvatarSelector';
