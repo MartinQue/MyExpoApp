@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 
 import { AskScreen } from './AskScreen';
-import { AlterEgoScreen } from './AlterEgoScreen';
+import AlterEgoScreen from './AlterEgoScreen';
 import { useChatStore } from '@/stores/chatStore';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useVoiceContext } from '@/contexts/VoiceContext';
