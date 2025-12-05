@@ -1,13 +1,3 @@
-/**
- * AlterEgoScreen - Grok Ani-style Immersive AI Companion Experience
- * Features:
- * - Full-screen animated gradient background
- * - Floating action menu (Streaks, Capture, Outfit, Speaker, Settings)
- * - Central "Start talking" button
- * - Grok-style suggestion chips
- * - Minimal chat input bar with mic, video, and Chat button
- */
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
@@ -23,6 +13,7 @@ import {
   Modal,
   TouchableWithoutFeedback,
   Image,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -49,51 +40,18 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ChatMessage, sendMessageToAI } from '../chat/ChatHelpers';
-import { AVATAR_PRESETS, SUGGESTION_CHIPS } from '@/constants/Avatars';
+import { AVATAR_PRESETS, AvatarPreset, SUGGESTION_CHIPS } from '@/constants/Avatars';
 import { useUserStore } from '@/stores/userStore';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useVoiceContext } from '@/contexts/VoiceContext';
 import haptics from '@/lib/haptics';
 import * as Speech from 'expo-speech';
 import AvatarController, { AvatarState } from '../live2d/AvatarController';
-import AvatarSelector from '../live2d/AvatarSelector';
-import { Live2DModel } from '../live2d/Live2DAvatar';
 import { useElevenLabs } from '@/lib/voice/elevenLabsService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
 
-// Floating action button configuration (Grok Ani style)
-const FLOATING_ACTIONS = [
-  {
-    id: 'streaks',
-    icon: 'flame',
-    label: 'Streaks',
-    badge: 4,
-    color: '#FF6B00',
-  },
-  { id: 'capture', icon: 'scan-outline', label: 'Capture', color: '#ffffff' },
-  {
-    id: 'outfit',
-    icon: 'shirt-outline',
-    label: 'Outfit',
-    badge: 1,
-    color: '#ffffff',
-  },
-  {
-    id: 'speaker',
-    icon: 'volume-high-outline',
-    label: 'Speaker',
-    color: '#ffffff',
-  },
-  {
-    id: 'settings',
-    icon: 'settings-outline',
-    label: 'Settings',
-    color: '#ffffff',
-  },
-];
-
-// Individual wave bar component to comply with React hooks rules
 function WaveBar({
   value,
   color,
@@ -140,7 +98,6 @@ function WaveBar({
   );
 }
 
-// Voice wave animation component
 function VoiceWaveAnimation({
   isActive,
   color = '#ffffff',
@@ -165,149 +122,215 @@ function VoiceWaveAnimation({
   );
 }
 
-// Floating Action Menu Component
-function FloatingActionMenu({
-  isExpanded,
-  onToggle,
-  onAction,
-  isMuted,
+function AvatarCard({
+  avatar,
+  customName,
+  isSelected,
+  onSelect,
+  onChat,
+  onVoice,
+  onRename,
 }: {
-  isExpanded: boolean;
-  onToggle: () => void;
-  onAction: (actionId: string) => void;
-  isMuted: boolean;
+  avatar: AvatarPreset;
+  customName?: string;
+  isSelected: boolean;
+  onSelect: () => void;
+  onChat: () => void;
+  onVoice: () => void;
+  onRename: () => void;
 }) {
   const { colors, isDark } = useTheme();
+  const displayName = customName || avatar.name;
+  const glassBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(45, 42, 38, 0.06)';
+  const glassBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(45, 42, 38, 0.1)';
   const textColor = isDark ? '#ffffff' : colors.text;
-  const subtleTextColor = isDark ? 'rgba(255, 255, 255, 0.9)' : colors.textSecondary;
-  const glassBg = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(45, 42, 38, 0.08)';
+  const subtleColor = isDark ? 'rgba(255, 255, 255, 0.7)' : colors.textSecondary;
 
   return (
-    <View style={styles.floatingMenuContainer}>
-      {isExpanded ? (
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          style={styles.floatingMenuExpanded}
-        >
-          {FLOATING_ACTIONS.map((action, index) => (
-            <Animated.View
-              key={action.id}
-              entering={SlideInRight.delay(index * 50).duration(200)}
-            >
-              <Pressable
-                style={styles.floatingActionItem}
-                onPress={() => onAction(action.id)}
-              >
-                <Text style={[styles.floatingActionLabel, { color: subtleTextColor }]}>{action.label}</Text>
-                <View
-                  style={[
-                    styles.floatingActionButton,
-                    { backgroundColor: glassBg },
-                  ]}
-                >
-                  <Ionicons
-                    name={
-                      action.id === 'speaker' && isMuted
-                        ? 'volume-mute-outline'
-                        : (action.icon as any)
-                    }
-                    size={22}
-                    color={action.id === 'streaks' ? action.color : textColor}
-                  />
-                  {action.badge && (
-                    <View
-                      style={[
-                        styles.actionBadge,
-                        { backgroundColor: action.color },
-                      ]}
-                    >
-                      <Text style={styles.actionBadgeText}>{action.badge}</Text>
-                    </View>
-                  )}
-                </View>
-              </Pressable>
-            </Animated.View>
-          ))}
-          {/* Close button */}
-          <Pressable style={styles.floatingActionItem} onPress={onToggle}>
-            <Text style={[styles.floatingActionLabel, { color: subtleTextColor }]}>Close</Text>
-            <View
-              style={[
-                styles.floatingActionButton,
-                { backgroundColor: glassBg },
-              ]}
-            >
-              <Ionicons name="chevron-up" size={22} color={textColor} />
-            </View>
-          </Pressable>
-        </Animated.View>
-      ) : (
-        <Pressable
+    <Animated.View entering={FadeIn.duration(300)} style={styles.cardWrapper}>
+      <Pressable onPress={onSelect}>
+        <BlurView
+          intensity={isDark ? 40 : 20}
+          tint={isDark ? 'dark' : 'light'}
           style={[
-            styles.menuToggleButton,
-            { backgroundColor: glassBg },
+            styles.avatarCard,
+            {
+              borderColor: isSelected ? avatar.colors.primary : glassBorder,
+              borderWidth: isSelected ? 2 : 1,
+            },
           ]}
-          onPress={onToggle}
         >
-          <Ionicons name="grid-outline" size={22} color={textColor} />
-        </Pressable>
-      )}
-    </View>
+          <View style={[styles.cardInner, { backgroundColor: glassBg }]}>
+            <View style={styles.avatarImageContainer}>
+              <Image
+                source={{ uri: avatar.avatarImage }}
+                style={styles.avatarImage}
+                resizeMode="cover"
+              />
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.7)']}
+                style={styles.avatarGradient}
+              />
+              {isSelected && (
+                <View style={[styles.selectedBadge, { backgroundColor: avatar.colors.primary }]}>
+                  <Ionicons name="checkmark" size={14} color="#fff" />
+                </View>
+              )}
+            </View>
+            <View style={styles.cardContent}>
+              <Pressable onPress={onRename} style={styles.nameRow}>
+                <Text style={[styles.avatarName, { color: textColor }]} numberOfLines={1}>
+                  {displayName}
+                </Text>
+                <Ionicons name="pencil" size={12} color={subtleColor} />
+              </Pressable>
+              <Text style={[styles.avatarPersonality, { color: avatar.colors.primary }]}>
+                {avatar.personality}
+              </Text>
+              <Text style={[styles.avatarDescription, { color: subtleColor }]} numberOfLines={2}>
+                {avatar.description}
+              </Text>
+              <View style={styles.actionButtons}>
+                <Pressable
+                  style={[styles.actionBtn, { backgroundColor: avatar.colors.primary }]}
+                  onPress={onChat}
+                >
+                  <Ionicons name="chatbubble" size={14} color="#fff" />
+                  <Text style={styles.actionBtnText}>Chat</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.actionBtn, { backgroundColor: glassBg, borderWidth: 1, borderColor: glassBorder }]}
+                  onPress={onVoice}
+                >
+                  <Ionicons name="mic" size={14} color={textColor} />
+                  <Text style={[styles.actionBtnText, { color: textColor }]}>Voice</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </BlurView>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function RenameModal({
+  visible,
+  avatarName,
+  currentName,
+  onSave,
+  onClose,
+}: {
+  visible: boolean;
+  avatarName: string;
+  currentName: string;
+  onSave: (name: string) => void;
+  onClose: () => void;
+}) {
+  const { colors, isDark } = useTheme();
+  const [name, setName] = useState(currentName);
+
+  useEffect(() => {
+    setName(currentName);
+  }, [currentName, visible]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.modalOverlay}>
+          <TouchableWithoutFeedback>
+            <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={styles.renameModal}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Rename Your Avatar
+              </Text>
+              <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
+                Give {avatarName} a custom name
+              </Text>
+              <TextInput
+                style={[
+                  styles.renameInput,
+                  {
+                    color: colors.text,
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                    borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)',
+                  },
+                ]}
+                value={name}
+                onChangeText={setName}
+                placeholder={avatarName}
+                placeholderTextColor={colors.textMuted}
+                autoFocus
+              />
+              <View style={styles.modalButtons}>
+                <Pressable style={styles.modalCancelBtn} onPress={onClose}>
+                  <Text style={[styles.modalBtnText, { color: colors.textSecondary }]}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
+                  onPress={() => {
+                    onSave(name.trim() || avatarName);
+                    onClose();
+                  }}
+                >
+                  <Text style={[styles.modalBtnText, { color: '#fff' }]}>Save</Text>
+                </Pressable>
+              </View>
+            </BlurView>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
   );
 }
 
 export function AlterEgoScreen() {
   const { colors, isDark } = useTheme();
-  const { hapticEnabled } = useUserStore();
+  const {
+    hapticEnabled,
+    avatarCustomNames,
+    selectedAvatarId,
+    setAvatarCustomName,
+    setSelectedAvatar,
+  } = useUserStore();
   const {
     isListening,
-    isTranscribing,
-    duration,
     startRecording,
     stopRecording,
-    cancelRecording,
   } = useVoiceContext();
-
-  // ElevenLabs TTS integration
   const {
     isSpeaking: isElevenLabsSpeaking,
     speak: speakWithElevenLabs,
     stop: stopElevenLabs,
   } = useElevenLabs();
 
+  const [mode, setMode] = useState<'grid' | 'chat'>('grid');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [currentAvatarIndex, setCurrentAvatarIndex] = useState(0);
   const [isThinking, setIsThinking] = useState(false);
-  const [showMessages, setShowMessages] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [inputText, setInputText] = useState('');
-  const [isMenuExpanded, setIsMenuExpanded] = useState(false);
-  const [showAttachments, setShowAttachments] = useState(false);
-  const [showAvatarSelector, setShowAvatarSelector] = useState(false);
-  const [selectedLive2DModel, setSelectedLive2DModel] = useState<Live2DModel>('hiyori');
   const [avatarState, setAvatarState] = useState<AvatarState>('idle');
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [avatarToRename, setAvatarToRename] = useState<AvatarPreset | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
 
-  const currentAvatar = AVATAR_PRESETS[currentAvatarIndex];
-
-  // Animated values for pulsing orb
+  const selectedAvatar = AVATAR_PRESETS.find((a) => a.id === selectedAvatarId) || AVATAR_PRESETS[0];
   const orbPulse = useSharedValue(1);
   const orbGlow = useSharedValue(0.5);
 
-  // Initialize with greeting
   useEffect(() => {
-    setMessages([
-      {
-        _id: `greeting-${currentAvatar.id}`,
-        text: currentAvatar.greeting,
-        createdAt: new Date(),
-        user: { _id: 2, name: currentAvatar.name },
-      },
-    ]);
-  }, [currentAvatar.id]);
+    if (mode === 'chat') {
+      setMessages([
+        {
+          _id: `greeting-${selectedAvatar.id}`,
+          text: selectedAvatar.greeting,
+          createdAt: new Date(),
+          user: { _id: 2, name: avatarCustomNames[selectedAvatar.id] || selectedAvatar.name },
+        },
+      ]);
+    }
+  }, [mode, selectedAvatar.id]);
 
-  // Breathing animation for the orb
   useEffect(() => {
     orbPulse.value = withRepeat(
       withSequence(
@@ -333,21 +356,14 @@ export function AlterEgoScreen() {
   }));
 
   const scrollToBottom = () => {
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
   const handleSend = useCallback(
     async (text: string) => {
       if (!text.trim()) return;
-
       if (hapticEnabled) haptics.light();
-
-      // Stop any ongoing speech
-      if (isElevenLabsSpeaking) {
-        await stopElevenLabs();
-      }
+      if (isElevenLabsSpeaking) await stopElevenLabs();
 
       const userMsg: ChatMessage = {
         _id: `user_${Date.now()}`,
@@ -358,44 +374,34 @@ export function AlterEgoScreen() {
 
       setMessages((prev) => [...prev, userMsg]);
       setInputText('');
-      setShowMessages(true);
       scrollToBottom();
       setIsThinking(true);
-      setAvatarState('thinking'); // Avatar shows thinking expression
+      setAvatarState('thinking');
 
       try {
         const response = await sendMessageToAI(text, {
-          systemPrompt: currentAvatar.systemPrompt,
+          systemPrompt: selectedAvatar.systemPrompt,
         });
-
         if (hapticEnabled) haptics.success();
 
         const avatarResponse: ChatMessage = {
           ...response,
-          user: { _id: 2, name: currentAvatar.name },
+          user: { _id: 2, name: avatarCustomNames[selectedAvatar.id] || selectedAvatar.name },
         };
 
         setMessages((prev) => [...prev, avatarResponse]);
         scrollToBottom();
 
-        // Use ElevenLabs TTS if available and not muted
         if (!isMuted && avatarResponse.text) {
-          setAvatarState('speaking'); // Avatar shows speaking expression
-
+          setAvatarState('speaking');
           const success = await speakWithElevenLabs(avatarResponse.text, {
-            onComplete: () => {
-              setAvatarState('idle'); // Return to idle when done
-            },
-            onError: (error) => {
-              console.error('ElevenLabs error, falling back to Speech:', error);
-              // Fallback to expo-speech
+            onComplete: () => setAvatarState('idle'),
+            onError: () => {
               Speech.speak(avatarResponse.text!, { rate: 0.9, pitch: 1.0 });
               setAvatarState('idle');
             },
           });
-
           if (!success) {
-            // If ElevenLabs fails, use fallback
             Speech.speak(avatarResponse.text, { rate: 0.9, pitch: 1.0 });
             setAvatarState('idle');
           }
@@ -403,24 +409,23 @@ export function AlterEgoScreen() {
           setAvatarState('idle');
         }
       } catch (error) {
-        console.error('AlterEgo error:', error);
         setMessages((prev) => [
           ...prev,
           {
             _id: `error_${Date.now()}`,
             text: "I felt that pause. Take your time, I'm here.",
             createdAt: new Date(),
-            user: { _id: 2, name: currentAvatar.name },
+            user: { _id: 2, name: avatarCustomNames[selectedAvatar.id] || selectedAvatar.name },
           },
         ]);
         if (hapticEnabled) haptics.warning();
-        setAvatarState('sad'); // Show empathetic expression
+        setAvatarState('sad');
         setTimeout(() => setAvatarState('idle'), 2000);
       } finally {
         setIsThinking(false);
       }
     },
-    [currentAvatar, hapticEnabled, isMuted, isElevenLabsSpeaking, stopElevenLabs, speakWithElevenLabs]
+    [selectedAvatar, hapticEnabled, isMuted, isElevenLabsSpeaking, stopElevenLabs, speakWithElevenLabs, avatarCustomNames]
   );
 
   const handleVoicePress = async () => {
@@ -428,93 +433,59 @@ export function AlterEgoScreen() {
     Speech.stop();
 
     if (isListening) {
-      setAvatarState('thinking'); // Show thinking while transcribing
+      setAvatarState('thinking');
       try {
         const text = await stopRecording();
-        if (text?.trim()) {
-          handleSend(text);
-        } else {
-          setAvatarState('idle');
-        }
-      } catch (error) {
-        console.error('Voice error:', error);
+        if (text?.trim()) handleSend(text);
+        else setAvatarState('idle');
+      } catch {
         if (hapticEnabled) haptics.error();
         setAvatarState('sad');
         setTimeout(() => setAvatarState('idle'), 1500);
       }
     } else {
-      setAvatarState('listening'); // Show listening expression
+      setAvatarState('listening');
       const started = await startRecording();
       if (!started) {
         if (hapticEnabled) haptics.error();
-        setAvatarState('surprised'); // Show surprised on error
+        setAvatarState('surprised');
         setTimeout(() => setAvatarState('idle'), 1500);
       }
     }
   };
 
-  const handleSuggestionPress = (text: string) => {
+  const handleSelectAvatar = (avatar: AvatarPreset) => {
     if (hapticEnabled) haptics.selection();
-    handleSend(text);
+    setSelectedAvatar(avatar.id);
   };
 
-  const handleFloatingAction = (actionId: string) => {
-    if (hapticEnabled) haptics.selection();
-
-    switch (actionId) {
-      case 'streaks':
-        Alert.alert('Streaks', 'You have a 4-day streak! Keep it going 🔥');
-        break;
-      case 'capture':
-        handleCapture();
-        break;
-      case 'outfit':
-        // Open avatar selector
-        setShowAvatarSelector(true);
-        break;
-      case 'speaker':
-        setIsMuted(!isMuted);
-        if (isMuted) {
-          Speech.stop();
-        }
-        break;
-      case 'settings':
-        Alert.alert('Settings', 'Character settings coming soon!');
-        break;
-    }
-    setIsMenuExpanded(false);
+  const handleStartChat = (avatar: AvatarPreset) => {
+    if (hapticEnabled) haptics.medium();
+    setSelectedAvatar(avatar.id);
+    setMode('chat');
   };
 
-  const handleCapture = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Camera access is required');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets?.[0]) {
-      if (hapticEnabled) haptics.success();
-      handleSend('[Shared a photo]');
-    }
+  const handleStartVoice = (avatar: AvatarPreset) => {
+    if (hapticEnabled) haptics.medium();
+    setSelectedAvatar(avatar.id);
+    setMode('chat');
+    setTimeout(() => handleVoicePress(), 500);
   };
 
-  const handleVideoCall = () => {
+  const handleRename = (avatar: AvatarPreset) => {
     if (hapticEnabled) haptics.selection();
-    Alert.alert(
-      'Video Call',
-      'Video calls with your AI companion coming soon!'
-    );
+    setAvatarToRename(avatar);
+    setRenameModalVisible(true);
+  };
+
+  const handleSaveRename = (newName: string) => {
+    if (avatarToRename) {
+      setAvatarCustomName(avatarToRename.id, newName);
+    }
   };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isUser = item.user._id === 1;
-
     return (
       <Animated.View
         entering={FadeInDown.duration(300)}
@@ -530,262 +501,282 @@ export function AlterEgoScreen() {
             },
           ]}
         >
-          <Text style={[styles.messageText, { color: isDark ? '#ffffff' : colors.text }]}>{item.text}</Text>
+          <Text style={[styles.messageText, { color: isDark ? '#ffffff' : colors.text }]}>
+            {item.text}
+          </Text>
         </View>
       </Animated.View>
     );
   };
 
-  const gradientColors = isDark 
+  const gradientColors = isDark
     ? ['#2D1F4A', '#4A3070', '#6B3D8A', '#3D2060', '#1A0F30'] as const
     : [colors.gradients.chat.start, colors.gradients.chat.mid, colors.gradients.chat.end, colors.gradients.chat.mid, colors.gradients.chat.start] as const;
 
   const textColor = isDark ? '#ffffff' : colors.text;
-  const subtleTextColor = isDark ? 'rgba(255, 255, 255, 0.9)' : colors.textSecondary;
-  const mutedTextColor = isDark ? 'rgba(255, 255, 255, 0.7)' : colors.textMuted;
-  const mutedTextColorLight = isDark ? 'rgba(255, 255, 255, 0.4)' : colors.inputPlaceholder;
-  const glassBg = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(45, 42, 38, 0.08)';
+  const subtleTextColor = isDark ? 'rgba(255, 255, 255, 0.7)' : colors.textMuted;
+  const glassBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(45, 42, 38, 0.05)';
   const glassBorder = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(45, 42, 38, 0.1)';
-  const glassBgLight = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(45, 42, 38, 0.05)';
+
+  if (mode === 'grid') {
+    return (
+      <View style={styles.container}>
+        <LinearGradient colors={gradientColors} locations={[0, 0.25, 0.5, 0.75, 1]} style={StyleSheet.absoluteFill} />
+        {isDark && (
+          <>
+            <Animated.View style={[styles.backgroundBlob1, orbAnimatedStyle]} />
+            <Animated.View style={[styles.backgroundBlob2, orbAnimatedStyle]} />
+          </>
+        )}
+        <View style={styles.gridContent}>
+          <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
+            <Text style={[styles.headerTitle, { color: textColor }]}>Companions</Text>
+            <Text style={[styles.headerSubtitle, { color: subtleTextColor }]}>
+              Choose an avatar to start talking
+            </Text>
+          </Animated.View>
+          <ScrollView
+            contentContainerStyle={styles.gridContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.grid}>
+              {AVATAR_PRESETS.map((avatar) => (
+                <AvatarCard
+                  key={avatar.id}
+                  avatar={avatar}
+                  customName={avatarCustomNames[avatar.id]}
+                  isSelected={avatar.id === selectedAvatarId}
+                  onSelect={() => handleSelectAvatar(avatar)}
+                  onChat={() => handleStartChat(avatar)}
+                  onVoice={() => handleStartVoice(avatar)}
+                  onRename={() => handleRename(avatar)}
+                />
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+        <RenameModal
+          visible={renameModalVisible}
+          avatarName={avatarToRename?.name || ''}
+          currentName={avatarToRename ? (avatarCustomNames[avatarToRename.id] || avatarToRename.name) : ''}
+          onSave={handleSaveRename}
+          onClose={() => setRenameModalVisible(false)}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* Full-screen gradient background */}
-      <LinearGradient
-        colors={gradientColors}
-        locations={[0, 0.25, 0.5, 0.75, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-
-      {/* Animated background blobs */}
+      <LinearGradient colors={gradientColors} locations={[0, 0.25, 0.5, 0.75, 1]} style={StyleSheet.absoluteFill} />
       {isDark && (
         <>
           <Animated.View style={[styles.backgroundBlob1, orbAnimatedStyle]} />
           <Animated.View style={[styles.backgroundBlob2, orbAnimatedStyle]} />
         </>
       )}
-
-      {/* Main content */}
-      <View style={styles.content}>
-        {/* Center area - Live2D Avatar or messages */}
-        <View style={styles.centerArea}>
-          {!showMessages ? (
-            <View style={styles.avatarContainer}>
-              {/* Live2D Avatar */}
-              <View style={styles.avatarWrapper}>
-                <AvatarController
-                  model={selectedLive2DModel}
-                  state={avatarState}
-                  isSpeaking={isElevenLabsSpeaking}
-                  onReady={() => console.log('Avatar ready')}
-                  onError={(error) => console.error('Avatar error:', error)}
-                  style={styles.avatar}
-                />
-              </View>
-
-              {/* Start talking button overlay */}
-              <Animated.View
-                entering={ZoomIn.duration(400)}
-                style={styles.startTalkingContainer}
-              >
-                <Pressable
-                  style={[styles.startTalkingButton, { backgroundColor: glassBgLight, borderColor: glassBorder }]}
-                  onPress={handleVoicePress}
-                >
-                  <VoiceWaveAnimation isActive={isListening} color={textColor} />
-                  <Text style={[styles.startTalkingText, { color: textColor }]}>
-                    {isListening ? 'Listening...' : 'Start talking'}
-                  </Text>
-                </Pressable>
-              </Animated.View>
-            </View>
-          ) : (
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              renderItem={renderMessage}
-              keyExtractor={(item) => item._id.toString()}
-              contentContainerStyle={styles.messagesList}
-              showsVerticalScrollIndicator={false}
-              onContentSizeChange={scrollToBottom}
-            />
-          )}
+      <View style={styles.chatContent}>
+        <View style={styles.chatHeader}>
+          <Pressable
+            style={[styles.backButton, { backgroundColor: glassBg }]}
+            onPress={() => {
+              if (hapticEnabled) haptics.selection();
+              setMode('grid');
+            }}
+          >
+            <Ionicons name="chevron-back" size={22} color={textColor} />
+          </Pressable>
+          <View style={styles.chatHeaderInfo}>
+            <Text style={[styles.chatHeaderName, { color: textColor }]}>
+              {avatarCustomNames[selectedAvatar.id] || selectedAvatar.name}
+            </Text>
+            <Text style={[styles.chatHeaderStatus, { color: selectedAvatar.colors.primary }]}>
+              {avatarState === 'speaking' ? 'Speaking...' : avatarState === 'listening' ? 'Listening...' : 'Online'}
+            </Text>
+          </View>
+          <Pressable
+            style={[styles.muteButton, { backgroundColor: glassBg }]}
+            onPress={() => setIsMuted(!isMuted)}
+          >
+            <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={20} color={textColor} />
+          </Pressable>
         </View>
-
-        {/* Floating Action Menu (Right side) */}
-        <FloatingActionMenu
-          isExpanded={isMenuExpanded}
-          onToggle={() => {
-            if (hapticEnabled) haptics.selection();
-            setIsMenuExpanded(!isMenuExpanded);
-          }}
-          onAction={handleFloatingAction}
-          isMuted={isMuted}
-        />
-
-        {/* Bottom section - Suggestions & Input */}
+        <View style={styles.avatarWrapper}>
+          <AvatarController
+            model={selectedAvatar.live2dModel}
+            state={avatarState}
+            isSpeaking={isElevenLabsSpeaking}
+            onReady={() => {}}
+            onError={() => {}}
+            style={styles.avatar}
+          />
+        </View>
+        {messages.length > 1 && (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item._id.toString()}
+            contentContainerStyle={styles.messagesList}
+            showsVerticalScrollIndicator={false}
+            onContentSizeChange={scrollToBottom}
+            style={styles.messagesContainer}
+          />
+        )}
         <View style={styles.bottomSection}>
-          {/* Suggestion chips (Grok Ani style) */}
-          {!showMessages && (
-            <Animated.View
-              entering={SlideInUp.delay(300).duration(400)}
-              style={styles.suggestionsRow}
-            >
+          {messages.length <= 1 && (
+            <Animated.View entering={SlideInUp.delay(300).duration(400)} style={styles.suggestionsRow}>
               {SUGGESTION_CHIPS.map((chip) => (
                 <Pressable
                   key={chip.id}
                   style={[styles.suggestionChip, { backgroundColor: glassBg, borderColor: glassBorder }]}
-                  onPress={() => handleSuggestionPress(chip.text)}
+                  onPress={() => handleSend(chip.text)}
                 >
                   <Text style={[styles.suggestionText, { color: subtleTextColor }]}>{chip.text}</Text>
                 </Pressable>
               ))}
             </Animated.View>
           )}
-
-          {/* Input bar (Grok Ani style) */}
-          <View style={[styles.inputBar, { backgroundColor: glassBgLight, borderColor: glassBorder }]}>
-            {/* Mic button */}
+          <View style={[styles.inputBar, { backgroundColor: glassBg, borderColor: glassBorder }]}>
             <Pressable
-              style={[
-                styles.inputIconButton,
-                { backgroundColor: glassBgLight },
-                isListening && styles.inputIconButtonActive,
-              ]}
+              style={[styles.inputIconButton, { backgroundColor: glassBg }, isListening && styles.inputIconButtonActive]}
               onPress={handleVoicePress}
             >
-              <Ionicons
-                name={isListening ? 'mic' : 'mic-outline'}
-                size={22}
-                color={isListening ? colors.primary : mutedTextColor}
-              />
+              <Ionicons name={isListening ? 'mic' : 'mic-outline'} size={22} color={isListening ? colors.primary : subtleTextColor} />
             </Pressable>
-
-            {/* Video button */}
-            <Pressable style={[styles.inputIconButton, { backgroundColor: glassBgLight }]} onPress={handleVideoCall}>
-              <Ionicons
-                name="videocam-outline"
-                size={22}
-                color={mutedTextColor}
-              />
-            </Pressable>
-
-            {/* Text input */}
             <View style={styles.textInputContainer}>
               <TextInput
                 ref={inputRef}
                 style={[styles.textInput, { color: textColor }]}
                 placeholder="Ask Anything"
-                placeholderTextColor={mutedTextColorLight}
+                placeholderTextColor={subtleTextColor}
                 value={inputText}
                 onChangeText={setInputText}
                 onSubmitEditing={() => handleSend(inputText)}
                 returnKeyType="send"
               />
             </View>
-
-            {/* Chat/Send button */}
             <Pressable
               style={[
                 styles.chatButton,
-                { backgroundColor: isDark ? '#ffffff' : colors.primary },
-                inputText.trim() && { backgroundColor: colors.primary },
+                { backgroundColor: inputText.trim() ? selectedAvatar.colors.primary : (isDark ? '#ffffff' : colors.primary) },
               ]}
-              onPress={() =>
-                inputText.trim()
-                  ? handleSend(inputText)
-                  : inputRef.current?.focus()
-              }
+              onPress={() => inputText.trim() ? handleSend(inputText) : inputRef.current?.focus()}
             >
               <Ionicons
                 name={inputText.trim() ? 'send' : 'chatbubble-outline'}
                 size={18}
                 color={inputText.trim() ? '#ffffff' : (isDark ? '#000000' : '#ffffff')}
               />
-              <Text style={[styles.chatButtonText, { color: inputText.trim() ? '#ffffff' : (isDark ? '#000000' : '#ffffff') }]}>
-                {inputText.trim() ? 'Send' : 'Chat'}
-              </Text>
             </Pressable>
           </View>
         </View>
       </View>
-
-      {/* Attachment Modal */}
-      <Modal
-        visible={showAttachments}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowAttachments(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setShowAttachments(false)}>
-          <View style={styles.modalOverlay}>
-            <BlurView intensity={60} tint="dark" style={styles.attachmentMenu}>
-              <Pressable
-                style={styles.attachmentOption}
-                onPress={handleCapture}
-              >
-                <View style={styles.attachmentIconBadge}>
-                  <Ionicons name="camera-outline" size={24} color="#ffffff" />
-                </View>
-                <Text style={styles.attachmentLabel}>Camera</Text>
-              </Pressable>
-              <Pressable
-                style={styles.attachmentOption}
-                onPress={async () => {
-                  setShowAttachments(false);
-                  const result = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ['images'],
-                    quality: 0.8,
-                  });
-                  if (!result.canceled) {
-                    handleSend('[Shared a photo]');
-                  }
-                }}
-              >
-                <View style={styles.attachmentIconBadge}>
-                  <Ionicons name="images-outline" size={24} color="#ffffff" />
-                </View>
-                <Text style={styles.attachmentLabel}>Photos</Text>
-              </Pressable>
-              <Pressable
-                style={styles.attachmentOption}
-                onPress={() => setShowAttachments(false)}
-              >
-                <View style={styles.attachmentIconBadge}>
-                  <Ionicons name="document-outline" size={24} color="#ffffff" />
-                </View>
-                <Text style={styles.attachmentLabel}>Files</Text>
-              </Pressable>
-            </BlurView>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* Avatar Selector Modal */}
-      <AvatarSelector
-        visible={showAvatarSelector}
-        currentAvatar={selectedLive2DModel}
-        onSelect={(avatar) => {
-          setSelectedLive2DModel(avatar);
-          setShowAvatarSelector(false);
-          setAvatarState('happy'); // Show happy expression on avatar change
-          setTimeout(() => setAvatarState('idle'), 2000);
-        }}
-        onClose={() => setShowAvatarSelector(false)}
-      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
+  container: { flex: 1 },
+  gridContent: {
     flex: 1,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
-  // Background animated blobs
+  header: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 15,
+  },
+  gridContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 100,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  cardWrapper: {
+    width: CARD_WIDTH,
+    marginBottom: 16,
+  },
+  avatarCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  cardInner: {
+    borderRadius: 20,
+  },
+  avatarImageContainer: {
+    width: '100%',
+    height: 140,
+    position: 'relative',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  selectedBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardContent: {
+    padding: 12,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  avatarName: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  avatarPersonality: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  avatarDescription: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 10,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  actionBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
   backgroundBlob1: {
     position: 'absolute',
     width: SCREEN_WIDTH * 0.8,
@@ -794,7 +785,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(139, 92, 246, 0.3)',
     top: SCREEN_HEIGHT * 0.15,
     left: -SCREEN_WIDTH * 0.2,
-    transform: [{ scale: 1.2 }],
   },
   backgroundBlob2: {
     position: 'absolute',
@@ -805,111 +795,132 @@ const styles = StyleSheet.create({
     top: SCREEN_HEIGHT * 0.4,
     right: -SCREEN_WIDTH * 0.15,
   },
-  // Center area
-  centerArea: {
+  modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
   },
-  avatarContainer: {
+  renameModal: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 20,
+    padding: 24,
+    overflow: 'hidden',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    marginBottom: 20,
+  },
+  renameInput: {
+    fontSize: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelBtn: {
     flex: 1,
-    position: 'relative',
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+  modalSaveBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+  modalBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  chatContent: {
+    flex: 1,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatHeaderInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  chatHeaderName: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  chatHeaderStatus: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  muteButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarWrapper: {
-    position: 'absolute',
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT * 0.6,
-    top: '10%',
-    left: 0,
-    right: 0,
+    height: SCREEN_HEIGHT * 0.35,
+    marginBottom: 10,
   },
   avatar: {
     flex: 1,
   },
-  startTalkingContainer: {
-    position: 'absolute',
-    bottom: SCREEN_HEIGHT * 0.15,
-    alignItems: 'center',
-    justifyContent: 'center',
+  messagesContainer: {
+    flex: 1,
+    maxHeight: SCREEN_HEIGHT * 0.25,
   },
-  startTalkingButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 30,
-    borderWidth: 1,
+  messagesList: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
   },
-  startTalkingText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 8,
-  },
-  // Voice wave animation
-  waveContainer: {
+  messageRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 40,
-    gap: 4,
+    marginBottom: 10,
   },
-  waveBar: {
-    width: 4,
-    borderRadius: 2,
-    minHeight: 12,
+  userRow: { justifyContent: 'flex-end' },
+  aiRow: { justifyContent: 'flex-start' },
+  userBubble: {
+    maxWidth: '75%',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
+    borderBottomRightRadius: 4,
   },
-  // Floating action menu
-  floatingMenuContainer: {
-    position: 'absolute',
-    right: 16,
-    top: SCREEN_HEIGHT * 0.15,
+  aiBubble: {
+    maxWidth: '75%',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
+    borderBottomLeftRadius: 4,
   },
-  floatingMenuExpanded: {
-    gap: 12,
+  messageText: {
+    fontSize: 15,
+    lineHeight: 20,
   },
-  floatingActionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 12,
-  },
-  floatingActionLabel: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  floatingActionButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  actionBadgeText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  menuToggleButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // Bottom section
   bottomSection: {
     paddingHorizontal: 16,
     paddingBottom: Platform.OS === 'ios' ? 34 : 16,
@@ -918,19 +929,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 10,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   suggestionChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 18,
     borderWidth: 1,
   },
   suggestionText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
-  // Input bar
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -958,86 +968,22 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   chatButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-  },
-  chatButtonActive: {
-    backgroundColor: '#8B5CF6',
-  },
-  chatButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  // Messages
-  messagesList: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-  },
-  messageRow: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  userRow: {
-    justifyContent: 'flex-end',
-  },
-  aiRow: {
-    justifyContent: 'flex-start',
-  },
-  userBubble: {
-    maxWidth: '80%',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    borderBottomRightRadius: 6,
-  },
-  aiBubble: {
-    maxWidth: '80%',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    borderBottomLeftRadius: 6,
-  },
-  messageText: {
-    color: '#ffffff',
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  // Attachment modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  attachmentMenu: {
-    width: 240,
-    borderRadius: 20,
-    overflow: 'hidden',
-    paddingVertical: 16,
-  },
-  attachmentOption: {
+  waveContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    gap: 16,
-  },
-  attachmentIconBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
-    alignItems: 'center',
+    height: 40,
+    gap: 4,
   },
-  attachmentLabel: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '500',
+  waveBar: {
+    width: 4,
+    borderRadius: 2,
+    minHeight: 12,
   },
 });

@@ -29,6 +29,10 @@ interface UserState {
   likedCards: string[];
   bookmarkedCards: string[];
 
+  // Avatar customization
+  avatarCustomNames: Record<string, string>;
+  selectedAvatarId: string;
+
   // Actions
   setUser: (user: Partial<User>) => void;
   updateCredits: (amount: number) => void;
@@ -47,6 +51,11 @@ interface UserState {
   toggleBookmarkCard: (cardId: string) => void;
   isCardLiked: (cardId: string) => boolean;
   isCardBookmarked: (cardId: string) => boolean;
+
+  // Avatar actions
+  setAvatarCustomName: (avatarId: string, customName: string) => void;
+  getAvatarCustomName: (avatarId: string) => string | undefined;
+  setSelectedAvatar: (avatarId: string) => void;
 
   // Auth actions
   login: (
@@ -86,6 +95,8 @@ export const useUserStore = create<UserState>()(
       voiceEnabled: true,
       likedCards: [],
       bookmarkedCards: [],
+      avatarCustomNames: {},
+      selectedAvatarId: 'lumen',
 
       setUser: (userData) =>
         set((state) => ({
@@ -214,6 +225,21 @@ export const useUserStore = create<UserState>()(
 
       isCardLiked: (cardId) => get().likedCards.includes(cardId),
       isCardBookmarked: (cardId) => get().bookmarkedCards.includes(cardId),
+
+      setAvatarCustomName: (avatarId, customName) => {
+        set((state) => ({
+          avatarCustomNames: {
+            ...state.avatarCustomNames,
+            [avatarId]: customName,
+          },
+        }));
+      },
+
+      getAvatarCustomName: (avatarId) => get().avatarCustomNames[avatarId],
+
+      setSelectedAvatar: (avatarId) => {
+        set({ selectedAvatarId: avatarId });
+      },
 
       login: async (email, password) => {
         set({ isLoading: true });
@@ -424,6 +450,8 @@ export const useUserStore = create<UserState>()(
         voiceEnabled: state.voiceEnabled,
         likedCards: state.likedCards,
         bookmarkedCards: state.bookmarkedCards,
+        avatarCustomNames: state.avatarCustomNames,
+        selectedAvatarId: state.selectedAvatarId,
       }),
     }
   )

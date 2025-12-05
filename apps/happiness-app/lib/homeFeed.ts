@@ -125,11 +125,13 @@ export interface FeedCard {
   details?: FeedCardDetails;
   isExpandable?: boolean;
   isSensitive?: boolean;
-  // New fields for enhanced cards
   externalUrl?: string;
   location?: string;
   weatherIcon?: string;
   accentColor?: string;
+  navigationRoute?: string;
+  navigationParams?: Record<string, any>;
+  sourceType?: 'internal' | 'external';
 }
 
 export interface DailyStats {
@@ -358,6 +360,8 @@ export function generateFinanceCard(): FeedCard {
     priority: 2,
     isExpandable: true,
     isSensitive: true,
+    externalUrl: 'https://finance.yahoo.com',
+    sourceType: 'external',
     details: {
       graphImage:
         'https://images.unsplash.com/photo-1642790106117-e829e14a795f?w=800',
@@ -415,12 +419,14 @@ export function generateFitnessCard(plans: Plan[]): FeedCard {
     agent: 'wellness',
     priority: 2,
     isExpandable: true,
+    navigationRoute: '/(tabs)/planner',
+    sourceType: 'internal',
     details: {
       whyStarted,
       comparison: {
         before:
-          'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400', // Placeholder before
-        goal: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400', // Placeholder goal
+          'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400',
+        goal: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400',
       },
       videoSnippet: randomVideo.thumbnail,
       videoTitle: randomVideo.title,
@@ -665,6 +671,8 @@ export function generateWellnessCard(timeOfDay: string): FeedCard {
     agent: 'wellness',
     context: 'home',
     isExpandable: true,
+    navigationRoute: '/(tabs)/chat',
+    sourceType: 'internal',
     details: {
       suggestedActions: [
         'Take 5 deep breaths',
@@ -703,6 +711,8 @@ export function getNextTaskCard(plans: Plan[]): FeedCard | null {
     priority: 2,
     context: 'planner',
     isExpandable: false,
+    navigationRoute: '/(tabs)/planner',
+    sourceType: 'internal',
   };
 }
 
@@ -932,6 +942,7 @@ export async function generatePersonalizedContextCard(params: {
 
 /**
  * Build the complete enhanced home feed with location context
+ * Optimized to prevent duplicate cards and ensure uniqueness
  */
 export async function buildHomeFeed(params: {
   userName: string;
@@ -943,8 +954,8 @@ export async function buildHomeFeed(params: {
   const { timeOfDay } = getTimeContext();
 
   const feed: FeedCard[] = [];
+  const seenTypes = new Set<string>();
 
-  // Get location context if enabled
   let locationContext: LocationContext | null = null;
   if (useLocation) {
     try {
@@ -956,45 +967,49 @@ export async function buildHomeFeed(params: {
     }
   }
 
-  // 1. Weather card (if location available) - high priority
   if (locationContext?.weather) {
     const weatherCard = generateWeatherCard(
       locationContext.location,
       locationContext.weather
     );
-    if (weatherCard) {
+    if (weatherCard && !seenTypes.has('weather')) {
+      seenTypes.add('weather');
       feed.push(weatherCard);
     }
   }
 
-  // 2. Personalized context card (combines location, weather, goals, time)
-  if (locationContext) {
-    const personalizedCard = await generatePersonalizedContextCard({
-      userName,
-      plans,
-      locationContext,
-      timeOfDay,
-    });
-    feed.push(personalizedCard);
-  }
-
-  // 3. Deep reflection card (highest priority - self-reflection)
   const reflection = await generateDeepReflectionCard({
     userName,
     plans,
     timeOfDay,
   });
-  feed.push(reflection);
+  if (!seenTypes.has('reflection')) {
+    seenTypes.add('reflection');
+    reflection.navigationRoute = '/(tabs)/chat';
+    reflection.sourceType = 'internal';
+    feed.push(reflection);
+  }
 
-  // 4. Financial insights card (if relevant)
-  const financeCard = generateFinanceCard();
-  feed.push(financeCard);
+  if (!seenTypes.has('finance')) {
+    seenTypes.add('finance');
+    const financeCard = generateFinanceCard();
+    feed.push(financeCard);
+  }
 
-  // 5. Fitness motivation card (if user has fitness goals)
-  const fitnessCard = generateFitnessCard(plans);
-  feed.push(fitnessCard);
+  const hasFitnessGoal = plans.some(
+    (p) =>
+      p.title.toLowerCase().includes('fit') ||
+      p.title.toLowerCase().includes('gym') ||
+      p.title.toLowerCase().includes('health') ||
+      p.title.toLowerCase().includes('workout') ||
+      p.title.toLowerCase().includes('exercise')
+  );
+  if (hasFitnessGoal && !seenTypes.has('fitness')) {
+    seenTypes.add('fitness');
+    const fitnessCard = generateFitnessCard(plans);
+    feed.push(fitnessCard);
+  }
 
-  // 6. Personalized quote
   const quote = await generatePersonalizedQuote({
     userName,
     mood:
@@ -1003,46 +1018,57 @@ export async function buildHomeFeed(params: {
         : undefined,
     recentActivity: plans[0]?.nextTask,
   });
-  feed.push(quote);
+  if (!seenTypes.has('quote')) {
+    seenTypes.add('quote');
+    feed.push(quote);
+  }
 
-  // 7. Daily insight
   const insight = await generateDailyInsight({
     userName,
     plans,
     timeOfDay,
   });
-  feed.push(insight);
-
-  // 8. Wellness check-in
-  feed.push(generateWellnessCard(timeOfDay));
-
-  // 9. Location-based suggestion
-  if (locationContext) {
-    const locationCard = generateLocationSuggestionCard(
-      locationContext,
-      userName
-    );
-    if (locationCard) {
-      feed.push(locationCard);
-    }
+  if (!seenTypes.has('insight')) {
+    seenTypes.add('insight');
+    insight.navigationRoute = '/(tabs)/planner';
+    insight.sourceType = 'internal';
+    feed.push(insight);
   }
 
-  // 10. Task cards for active plans
-  plans.slice(0, 2).forEach((plan) => {
-    feed.push({
-      id: `plan_${plan.id}`,
-      type: 'task',
-      title: plan.title,
-      content: `${plan.progress}% complete • Next: ${plan.nextTask}`,
-      time: plan.dueDate,
-      icon: 'flag-outline',
-      agent: 'planner',
-      context: 'planner',
-      isExpandable: false,
-    });
+  if (!seenTypes.has('wellness')) {
+    seenTypes.add('wellness');
+    feed.push(generateWellnessCard(timeOfDay));
+  }
+
+  const nonFitnessPlans = plans.filter(
+    (p) =>
+      !p.title.toLowerCase().includes('fit') &&
+      !p.title.toLowerCase().includes('gym') &&
+      !p.title.toLowerCase().includes('health') &&
+      !p.title.toLowerCase().includes('workout') &&
+      !p.title.toLowerCase().includes('exercise')
+  );
+  
+  nonFitnessPlans.slice(0, 2).forEach((plan) => {
+    const cardId = `plan_${plan.id}`;
+    if (!seenTypes.has(cardId)) {
+      seenTypes.add(cardId);
+      feed.push({
+        id: cardId,
+        type: 'task',
+        title: plan.title,
+        content: `${plan.progress}% complete • Next: ${plan.nextTask}`,
+        time: plan.dueDate,
+        icon: 'flag-outline',
+        agent: 'planner',
+        context: 'planner',
+        isExpandable: false,
+        navigationRoute: '/(tabs)/planner',
+        sourceType: 'internal',
+      });
+    }
   });
 
-  // Sort by priority (highest first)
   return feed.sort((a, b) => (b.priority || 0) - (a.priority || 0));
 }
 
@@ -1094,6 +1120,103 @@ export async function getDailyStats(userId?: string): Promise<DailyStats> {
     streak: 7,
     moodTrend: 'up',
   };
+}
+
+/**
+ * Generate instant static feed for fast initial load (no async calls)
+ * This provides immediate content while the full AI-powered feed loads
+ */
+export function generateInstantFeed(params: {
+  userName: string;
+  plans: Plan[];
+}): FeedCard[] {
+  const { userName, plans } = params;
+  const { timeOfDay } = getTimeContext();
+  const feed: FeedCard[] = [];
+
+  feed.push(generateFinanceCard());
+
+  const hasFitnessGoal = plans.some(
+    (p) =>
+      p.title.toLowerCase().includes('fit') ||
+      p.title.toLowerCase().includes('gym') ||
+      p.title.toLowerCase().includes('health')
+  );
+  if (hasFitnessGoal) {
+    feed.push(generateFitnessCard(plans));
+  }
+
+  feed.push(generateWellnessCard(timeOfDay));
+
+  const randomImage =
+    PLACEHOLDER_IMAGES.reflection[
+      Math.floor(Math.random() * PLACEHOLDER_IMAGES.reflection.length)
+    ];
+  const deepPrompts = [
+    'What is the ONE thing today that, if accomplished, would make everything else easier?',
+    'If today were your last day working toward this goal, what would you regret not doing?',
+    'What fear is holding you back right now? Name it.',
+  ];
+  feed.push({
+    id: `reflection_instant_${Date.now()}`,
+    type: 'reflection',
+    title: `${timeOfDay.charAt(0).toUpperCase() + timeOfDay.slice(1)} Reflection`,
+    content: deepPrompts[Math.floor(Math.random() * deepPrompts.length)],
+    image: randomImage,
+    time: 'Now',
+    icon: 'leaf-outline',
+    agent: 'alter_ego',
+    priority: 3,
+    isExpandable: true,
+    navigationRoute: '/(tabs)/chat',
+    sourceType: 'internal',
+    details: {
+      deepQuestion: deepPrompts[0],
+      suggestedActions: [
+        'Write in your journal',
+        'Share with someone you trust',
+        'Take one small action',
+      ],
+      relatedGoals: plans.slice(0, 2).map((p) => p.title),
+    },
+  });
+
+  const fallbackQuotes = [
+    "Progress is not about the destination. It's about the process that shapes who you become.",
+    'Every small step forward is still progress. Keep moving.',
+    'Today is a new opportunity to become the best version of yourself.',
+  ];
+  const motivationImage =
+    PLACEHOLDER_IMAGES.motivation[
+      Math.floor(Math.random() * PLACEHOLDER_IMAGES.motivation.length)
+    ];
+  feed.push({
+    id: `quote_instant_${Date.now()}`,
+    type: 'quote',
+    content: fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)],
+    image: motivationImage,
+    time: 'Now',
+    agent: 'alter_ego',
+    isExpandable: false,
+  });
+
+  plans.slice(0, 2).forEach((plan) => {
+    feed.push({
+      id: `plan_instant_${plan.id}`,
+      type: 'task',
+      title: plan.title,
+      content: `${plan.progress}% complete • Next: ${plan.nextTask}`,
+      time: plan.dueDate,
+      icon: 'flag-outline',
+      agent: 'planner',
+      context: 'planner',
+      isExpandable: false,
+      navigationRoute: '/(tabs)/planner',
+      sourceType: 'internal',
+    });
+  });
+
+  return feed.sort((a, b) => (b.priority || 0) - (a.priority || 0));
 }
 
 /**

@@ -41,6 +41,7 @@ interface CardDetailModalProps {
   onClose: () => void;
   onLike?: (liked: boolean) => void;
   onBookmark?: (bookmarked: boolean) => void;
+  onNavigate?: (card: FeedCardType) => void;
   isLiked?: boolean;
   isBookmarked?: boolean;
 }
@@ -51,6 +52,7 @@ export function CardDetailModal({
   onClose,
   onLike,
   onBookmark,
+  onNavigate,
   isLiked = false,
   isBookmarked = false,
 }: CardDetailModalProps) {
@@ -741,18 +743,45 @@ export function CardDetailModal({
                 </Text>
               </Pressable>
 
-              <Pressable
-                style={[
-                  styles.primaryButton,
-                  { backgroundColor: getAccentColor() },
-                ]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  handleClose();
-                }}
-              >
-                <Text style={styles.primaryButtonText}>Got it</Text>
-              </Pressable>
+              {(card.navigationRoute || card.externalUrl) ? (
+                <Pressable
+                  style={[
+                    styles.primaryButton,
+                    { backgroundColor: getAccentColor() },
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    if (onNavigate && card) {
+                      onNavigate(card);
+                    } else {
+                      handleClose();
+                    }
+                  }}
+                >
+                  <Ionicons 
+                    name={card.sourceType === 'external' ? 'open-outline' : 'arrow-forward'} 
+                    size={16} 
+                    color="white" 
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={styles.primaryButtonText}>
+                    {card.sourceType === 'external' ? 'Open' : 'Go'}
+                  </Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={[
+                    styles.primaryButton,
+                    { backgroundColor: getAccentColor() },
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    handleClose();
+                  }}
+                >
+                  <Text style={styles.primaryButtonText}>Got it</Text>
+                </Pressable>
+              )}
             </BlurView>
           </LinearGradient>
         </Animated.View>
@@ -1180,6 +1209,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,

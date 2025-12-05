@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Platform,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -38,6 +39,7 @@ import {
   getTimeContext,
   getDailyStats,
   refreshContextCards,
+  generateInstantFeed,
   FeedCard as FeedCardType,
   DailyStats,
 } from '@/lib/homeFeed';
@@ -51,7 +53,8 @@ import {
 
 const { width } = Dimensions.get('window');
 const HEADER_HEIGHT = 140;
-const FEED_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes - reduced for more dynamic updates
+const FEED_REFRESH_INTERVAL = 60 * 1000; // 1 minute for real-time updates
+const REAL_TIME_UPDATE_INTERVAL = 30 * 1000; // 30 seconds for background updates
 
 // Quick action items
 const QUICK_ACTIONS = [
@@ -200,8 +203,10 @@ export default function ProfileTab() {
   } = useUserStore();
   const { plans } = usePlannerStore();
   const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [feed, setFeed] = useState<FeedCardType[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [feed, setFeed] = useState<FeedCardType[]>(() =>
+    generateInstantFeed({ userName: user?.name || 'Friend', plans })
+  );
   const [stats, setStats] = useState<DailyStats | null>(null);
   const [contextMessage, setContextMessage] = useState('');
   const [locationContext, setLocationContext] =
@@ -211,7 +216,9 @@ export default function ProfileTab() {
   const router = useRouter();
   const scrollY = useSharedValue(0);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const realTimeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastRefreshRef = useRef<number>(0);
+  const isInitialLoadDone = useRef<boolean>(false);
 
   // Time context
   const timeContext = getTimeContext();
@@ -251,19 +258,22 @@ export default function ProfileTab() {
     initLocationContext();
   }, [timeOfDay]);
 
-  // Auto-refresh feed periodically
+  // Auto-refresh feed periodically for real-time updates
   useEffect(() => {
     refreshTimerRef.current = setInterval(async () => {
       const now = Date.now();
       if (now - lastRefreshRef.current >= FEED_REFRESH_INTERVAL) {
         console.log('🔄 Auto-refreshing feed...');
-        await loadFeed(true); // Silent refresh
+        await loadFeed(true);
       }
-    }, 60000); // Check every minute
+    }, REAL_TIME_UPDATE_INTERVAL);
 
     return () => {
       if (refreshTimerRef.current) {
         clearInterval(refreshTimerRef.current);
+      }
+      if (realTimeTimerRef.current) {
+        clearInterval(realTimeTimerRef.current);
       }
     };
   }, []);
@@ -329,7 +339,7 @@ export default function ProfileTab() {
   const loadFeed = useCallback(
     async (silent = false) => {
       try {
-        if (!silent) {
+        if (!silent && !isInitialLoadDone.current) {
           console.log('📱 Loading personalized home feed...');
         }
 
@@ -345,6 +355,7 @@ export default function ProfileTab() {
         setFeed(feedData);
         setStats(statsData);
         lastRefreshRef.current = Date.now();
+        isInitialLoadDone.current = true;
 
         if (!silent) {
           console.log(`✅ Loaded ${feedData.length} feed items`);
@@ -364,6 +375,12 @@ export default function ProfileTab() {
     loadFeed();
   }, [loadFeed]);
 
+  useEffect(() => {
+    if (plans.length > 0) {
+      setFeed(generateInstantFeed({ userName: user?.name || 'Friend', plans }));
+    }
+  }, [plans, user?.name]);
+
   // Refresh feed when tab comes into focus (activity-based refresh)
   useFocusEffect(
     useCallback(() => {
@@ -379,18 +396,40 @@ export default function ProfileTab() {
     }, [loadFeed])
   );
 
-  // Handle card tap - open full-screen modal for expandable cards
+  // Handle card tap - open full-screen modal for expandable cards, navigate for others
   const handleCardTap = useCallback((card: FeedCardType) => {
     if (card.isExpandable) {
       haptics.medium();
       setSelectedCard(card);
       setShowCardModal(true);
-    } else if (card.externalUrl) {
-      // Open external URL
+    } else if (card.navigationRoute && card.sourceType === 'internal') {
       haptics.light();
-      // Would use Linking.openURL here
+      router.push(card.navigationRoute as any);
+    } else if (card.externalUrl && card.sourceType === 'external') {
+      haptics.light();
+      Linking.openURL(card.externalUrl).catch((err) =>
+        console.error('Failed to open URL:', err)
+      );
     }
-  }, []);
+  }, [router]);
+
+  // Handle navigation from expanded card modal
+  const handleCardNavigate = useCallback((card: FeedCardType) => {
+    setShowCardModal(false);
+    setSelectedCard(null);
+    
+    setTimeout(() => {
+      if (card.navigationRoute && card.sourceType === 'internal') {
+        haptics.light();
+        router.push(card.navigationRoute as any);
+      } else if (card.externalUrl && card.sourceType === 'external') {
+        haptics.light();
+        Linking.openURL(card.externalUrl).catch((err) =>
+          console.error('Failed to open URL:', err)
+        );
+      }
+    }, 300);
+  }, [router]);
 
   // Handle like from modal
   const handleModalLike = useCallback(
@@ -734,25 +773,6 @@ export default function ProfileTab() {
     );
   };
 
-  if (loading) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <LinearGradient
-          colors={getGradientArray('profile')}
-          style={StyleSheet.absoluteFill}
-        />
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.loadingText, { color: colors.textMuted }]}>
-              Preparing your personalized feed...
-            </Text>
-          </View>
-        </SafeAreaView>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
@@ -802,6 +822,7 @@ export default function ProfileTab() {
           }}
           onLike={handleModalLike}
           onBookmark={handleModalBookmark}
+          onNavigate={handleCardNavigate}
           isLiked={selectedCard ? likedCards.includes(selectedCard.id) : false}
           isBookmarked={
             selectedCard ? bookmarkedCards.includes(selectedCard.id) : false

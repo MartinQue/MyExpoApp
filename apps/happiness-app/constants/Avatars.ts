@@ -19,6 +19,8 @@ export interface AvatarPreset {
   };
   emoji: string;
   voiceStyle: 'calm' | 'energetic' | 'mysterious' | 'warm' | 'playful';
+  avatarImage: string;
+  live2dModel: 'hiyori' | 'haru' | 'shizuku' | 'mao' | 'hijiki' | 'tororo';
 }
 
 export const AVATAR_PRESETS: AvatarPreset[] = [
@@ -45,6 +47,8 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
     emoji: '✨',
     voiceStyle: 'calm',
+    avatarImage: 'https://i.imgur.com/YQsY8Zl.png',
+    live2dModel: 'hiyori',
   },
   {
     id: 'nova',
@@ -53,7 +57,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     description:
       'An enthusiastic motivator who pushes you to achieve your goals',
     greeting:
-      "Hey! I'm Nova! 🚀 Ready to crush some goals today? Let's make things happen!",
+      "Hey! I'm Nova! Ready to crush some goals today? Let's make things happen!",
     systemPrompt: `You are Nova, an energetic and motivating AI companion. Your approach is:
 - High energy, enthusiastic, and action-oriented
 - Focus on goal achievement, productivity, and taking bold steps
@@ -69,6 +73,8 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
     emoji: '🚀',
     voiceStyle: 'energetic',
+    avatarImage: 'https://i.imgur.com/Kq3YXZQ.png',
+    live2dModel: 'haru',
   },
   {
     id: 'eclipse',
@@ -93,6 +99,8 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
     emoji: '🌙',
     voiceStyle: 'mysterious',
+    avatarImage: 'https://i.imgur.com/3YJsGwB.png',
+    live2dModel: 'shizuku',
   },
   {
     id: 'ember',
@@ -100,7 +108,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     personality: 'Warm & Nurturing',
     description: 'A caring friend who offers comfort and emotional support',
     greeting:
-      "Hi there, I'm Ember 💛 I'm here for you, whatever you need. How are you feeling today?",
+      "Hi there, I'm Ember. I'm here for you, whatever you need. How are you feeling today?",
     systemPrompt: `You are Ember, a warm and nurturing AI companion. Your approach is:
 - Warm, caring, and emotionally supportive
 - Create a safe space for vulnerability
@@ -116,6 +124,8 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
     emoji: '💛',
     voiceStyle: 'warm',
+    avatarImage: 'https://i.imgur.com/Wq5kHZL.png',
+    live2dModel: 'mao',
   },
   {
     id: 'pixel',
@@ -124,7 +134,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     description:
       'A fun, quirky companion who brings joy and creativity to every conversation',
     greeting:
-      "Beep boop! Just kidding, I'm Pixel! 🎮 Ready for some fun? What adventure shall we go on today?",
+      "Beep boop! Just kidding, I'm Pixel! Ready for some fun? What adventure shall we go on today?",
     systemPrompt: `You are Pixel, a playful and creative AI companion. Your approach is:
 - Fun, quirky, and full of humor
 - Encourage creativity and imagination
@@ -140,6 +150,8 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
     },
     emoji: '🎮',
     voiceStyle: 'playful',
+    avatarImage: 'https://i.imgur.com/LZsPqNt.png',
+    live2dModel: 'hijiki',
   },
 ];
 
