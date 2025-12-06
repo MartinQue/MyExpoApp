@@ -10,8 +10,8 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Keyboard,
-  ActivityIndicator,
   Image,
+  ImageSourcePropType,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -29,7 +29,6 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ChatMessage, sendMessageToAI } from '../chat/ChatHelpers';
 import { useUserStore } from '@/stores/userStore';
@@ -37,7 +36,6 @@ import { useVoiceContext } from '@/contexts/VoiceContext';
 import haptics from '@/lib/haptics';
 import * as Speech from 'expo-speech';
 import { useElevenLabs } from '@/lib/voice/elevenLabsService';
-import { generateImage } from '@/lib/imageGeneration';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
@@ -49,9 +47,9 @@ interface CompanionData {
   description: string;
   greeting: string;
   systemPrompt: string;
-  animePrompt: string;
   color: string;
   backgroundColor: string;
+  image: ImageSourcePropType;
 }
 
 const COMPANIONS: CompanionData[] = [
@@ -62,9 +60,9 @@ const COMPANIONS: CompanionData[] = [
     description: 'A calm guide focused on personal growth',
     greeting: "Hey there! I'm Mika. What's on your mind today?",
     systemPrompt: 'You are Mika, a free-spirited and loyal friend. Be casual, warm, and supportive.',
-    animePrompt: 'full body anime girl character, teal cyan hair in high ponytail with loose strands, large expressive green eyes, gentle warm smile, wearing oversized pastel blue hoodie with cat ears hood, white crop top underneath, high waisted jean shorts, white sneakers, soft cel shading, standing pose with hand on hip, high quality anime art style, vibrant colors, transparent background, full body visible from head to feet',
     color: '#4ECDC4',
     backgroundColor: '#0a1628',
+    image: require('@/assets/companions/mika.png'),
   },
   {
     id: 'ani',
@@ -73,9 +71,9 @@ const COMPANIONS: CompanionData[] = [
     description: 'Loves anime, games, and pop culture',
     greeting: "Hi! I'm Ani! Ready to chat about anything? Let's have fun!",
     systemPrompt: 'You are Ani, sweet and nerdy. Love anime, games, and pop culture. Be enthusiastic and cute.',
-    animePrompt: 'full body anime girl character, long flowing golden blonde hair to waist, bright blue eyes with sparkles, wearing black fitted tank top, silver cross pendant necklace, black leather choker with silver studs, dark purple pleated mini skirt, thigh high black stockings, black boots, confident cute pose with peace sign, high quality anime art style, transparent background, full body visible from head to feet',
     color: '#FF6B9D',
     backgroundColor: '#2a1a2e',
+    image: require('@/assets/companions/ani.png'),
   },
   {
     id: 'valentine',
@@ -84,9 +82,9 @@ const COMPANIONS: CompanionData[] = [
     description: 'Sophisticated with refined tastes',
     greeting: 'Good evening. I am Valentine. Shall we have an interesting conversation?',
     systemPrompt: 'You are Valentine, sophisticated and mysterious. Be elegant, charming, with subtle wit.',
-    animePrompt: 'full body handsome anime man character, silver white slicked back hair with undercut, piercing purple amethyst eyes, mysterious charming smile, wearing fitted black suit jacket, dark purple dress shirt unbuttoned at collar, black dress pants, polished black shoes, one hand in pocket pose, tall lean build, high quality anime art style, transparent background, full body visible from head to feet',
     color: '#8B5CF6',
     backgroundColor: '#1a1a2e',
+    image: require('@/assets/companions/valentine.png'),
   },
   {
     id: 'sakura',
@@ -95,9 +93,9 @@ const COMPANIONS: CompanionData[] = [
     description: 'A caring friend who offers comfort',
     greeting: "Hello! I'm Sakura. I'm here for you, whatever you need.",
     systemPrompt: 'You are Sakura, warm and nurturing. Be emotionally supportive, gentle, and caring.',
-    animePrompt: 'full body anime girl character, soft pink hair in twin low braids with cherry blossom flower accessories, warm honey brown eyes, gentle motherly smile, wearing white and pink traditional japanese inspired kimono style dress with modern twist, obi belt with floral pattern, wooden sandals, hands clasped in front pose, high quality anime art style, soft pink lighting, transparent background, full body visible from head to feet',
     color: '#F472B6',
     backgroundColor: '#2a1a28',
+    image: require('@/assets/companions/sakura.png'),
   },
   {
     id: 'kai',
@@ -105,25 +103,19 @@ const COMPANIONS: CompanionData[] = [
     personality: 'Playful rebel with a golden heart',
     description: 'Adventurous spirit who pushes your limits',
     greeting: "Yo! I'm Kai. Ready to shake things up? Let's go!",
-    systemPrompt: 'You are Kai, playful and rebellious but with a heart of gold. Be energetic, spontaneous, and encouraging. Push the user to try new things.',
-    animePrompt: 'full body anime boy character, messy spiky dark blue hair with bright red streaks and highlights, sharp intense amber orange eyes, confident cocky smirk, wearing black leather biker jacket with red flame accents, white graphic tee underneath, ripped black jeans, red high top sneakers, silver chain necklace, arms crossed pose, athletic build, high quality anime art style, neon red lighting accents, transparent background, full body visible from head to feet',
+    systemPrompt: 'You are Kai, playful and rebellious but with a heart of gold. Be energetic, spontaneous, and encouraging.',
     color: '#EF4444',
     backgroundColor: '#1a0a0a',
+    image: require('@/assets/companions/kai.png'),
   },
 ];
-
-const ANIME_CACHE_KEY = 'companion_anime_images';
 
 function AnimatedCharacter({ 
   companion, 
   isSpeaking,
-  generatedImage,
-  isGenerating 
 }: { 
   companion: CompanionData; 
   isSpeaking: boolean;
-  generatedImage: string | null;
-  isGenerating: boolean;
 }) {
   const breatheScale = useSharedValue(1);
   const floatY = useSharedValue(0);
@@ -131,7 +123,6 @@ function AnimatedCharacter({
   const headTilt = useSharedValue(0);
   const glowOpacity = useSharedValue(0.3);
   const pulseScale = useSharedValue(1);
-  const hairFloat = useSharedValue(0);
 
   useEffect(() => {
     breatheScale.value = withRepeat(
@@ -145,7 +136,7 @@ function AnimatedCharacter({
 
     floatY.value = withRepeat(
       withSequence(
-        withTiming(-8, { duration: 2500, easing: Easing.inOut(Easing.sin) }),
+        withTiming(-12, { duration: 2500, easing: Easing.inOut(Easing.sin) }),
         withTiming(0, { duration: 2500, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
@@ -154,8 +145,8 @@ function AnimatedCharacter({
 
     swayX.value = withRepeat(
       withSequence(
-        withDelay(500, withTiming(3, { duration: 3000, easing: Easing.inOut(Easing.sin) })),
-        withTiming(-3, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
+        withDelay(500, withTiming(4, { duration: 3000, easing: Easing.inOut(Easing.sin) })),
+        withTiming(-4, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
         withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
@@ -170,22 +161,13 @@ function AnimatedCharacter({
       -1,
       true
     );
-
-    hairFloat.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
-        withTiming(-1, { duration: 1800, easing: Easing.inOut(Easing.sin) })
-      ),
-      -1,
-      true
-    );
   }, []);
 
   useEffect(() => {
     if (isSpeaking) {
       glowOpacity.value = withRepeat(
         withSequence(
-          withTiming(0.8, { duration: 200 }),
+          withTiming(0.9, { duration: 200 }),
           withTiming(0.4, { duration: 200 })
         ),
         -1,
@@ -193,7 +175,7 @@ function AnimatedCharacter({
       );
       pulseScale.value = withRepeat(
         withSequence(
-          withTiming(1.03, { duration: 150 }),
+          withTiming(1.04, { duration: 150 }),
           withTiming(1, { duration: 150 })
         ),
         -1,
@@ -216,47 +198,23 @@ function AnimatedCharacter({
 
   const glowStyle = useAnimatedStyle(() => ({
     opacity: glowOpacity.value,
-    transform: [{ scale: 1 + (glowOpacity.value * 0.1) }],
+    transform: [{ scale: 1 + (glowOpacity.value * 0.15) }],
   }));
 
   const shadowStyle = useAnimatedStyle(() => ({
     transform: [
-      { scaleX: interpolate(floatY.value, [-8, 0], [0.85, 1]) },
-      { scaleY: interpolate(floatY.value, [-8, 0], [0.6, 0.8]) },
+      { scaleX: interpolate(floatY.value, [-12, 0], [0.8, 1]) },
+      { scaleY: interpolate(floatY.value, [-12, 0], [0.5, 0.8]) },
     ],
-    opacity: interpolate(floatY.value, [-8, 0], [0.2, 0.4]),
+    opacity: interpolate(floatY.value, [-12, 0], [0.15, 0.35]),
   }));
-
-  if (isGenerating) {
-    return (
-      <View style={styles.characterWrapper}>
-        <Animated.View style={[styles.characterGlow, glowStyle, { backgroundColor: companion.color }]} />
-        <View style={styles.generatingContainer}>
-          <ActivityIndicator size="large" color={companion.color} />
-          <Text style={styles.generatingText}>Summoning {companion.name}...</Text>
-        </View>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.characterWrapper}>
       <Animated.View style={[styles.characterGlow, glowStyle, { backgroundColor: companion.color }]} />
       <Animated.View style={[styles.characterShadow, shadowStyle]} />
       <Animated.View style={[styles.characterContainer, characterStyle]}>
-        {generatedImage ? (
-          <Image source={{ uri: generatedImage }} style={styles.characterImage} resizeMode="contain" />
-        ) : (
-          <LinearGradient
-            colors={[companion.color + '60', companion.color + '20', 'transparent']}
-            style={styles.fallbackCharacter}
-          >
-            <View style={[styles.avatarCircle, { borderColor: companion.color }]}>
-              <Text style={styles.avatarEmoji}>✨</Text>
-            </View>
-            <Text style={[styles.avatarName, { color: companion.color }]}>{companion.name}</Text>
-          </LinearGradient>
-        )}
+        <Image source={companion.image} style={styles.characterImage} resizeMode="contain" />
       </Animated.View>
     </View>
   );
@@ -264,11 +222,9 @@ function AnimatedCharacter({
 
 function CompanionCard({ 
   companion, 
-  cachedImage,
   onPress 
 }: { 
   companion: CompanionData; 
-  cachedImage: string | null;
   onPress: () => void;
 }) {
   const scale = useSharedValue(1);
@@ -277,7 +233,7 @@ function CompanionCard({
   useEffect(() => {
     cardFloat.value = withRepeat(
       withSequence(
-        withTiming(-3, { duration: 2000 + Math.random() * 1000, easing: Easing.inOut(Easing.sin) }),
+        withTiming(-4, { duration: 2000 + Math.random() * 1000, easing: Easing.inOut(Easing.sin) }),
         withTiming(0, { duration: 2000 + Math.random() * 1000, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
@@ -300,16 +256,7 @@ function CompanionCard({
       style={styles.cardWrapper}
     >
       <Animated.View style={[styles.card, { backgroundColor: companion.backgroundColor }, cardStyle]}>
-        {cachedImage ? (
-          <Image source={{ uri: cachedImage }} style={styles.cardImage} resizeMode="cover" />
-        ) : (
-          <LinearGradient
-            colors={[companion.color + '60', companion.backgroundColor]}
-            style={styles.cardImageFallback}
-          >
-            <Text style={styles.cardEmoji}>✨</Text>
-          </LinearGradient>
-        )}
+        <Image source={companion.image} style={styles.cardImage} resizeMode="cover" />
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.95)']} style={styles.cardOverlay} />
         <View style={styles.cardContent}>
           <Text style={styles.cardName}>{companion.name}</Text>
@@ -331,13 +278,9 @@ function CompanionCard({
 function ChatScreen({ 
   companion, 
   onBack,
-  cachedImage,
-  onImageGenerated,
 }: { 
   companion: CompanionData; 
   onBack: () => void;
-  cachedImage: string | null;
-  onImageGenerated: (id: string, url: string) => void;
 }) {
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -346,17 +289,9 @@ function ChatScreen({
   const [inputText, setInputText] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(cachedImage);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const { isListening: isRecording, startRecording, stopRecording } = useVoiceContext();
   const { isSpeaking, speak: speakWithElevenLabs } = useElevenLabs();
-
-  useEffect(() => {
-    if (!cachedImage && !generatedImage && !isGeneratingImage) {
-      generateAnimeCharacter();
-    }
-  }, [companion.id]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -365,23 +300,6 @@ function ChatScreen({
     const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
-
-  const generateAnimeCharacter = async () => {
-    setIsGeneratingImage(true);
-    try {
-      const result = await generateImage(companion.animePrompt, {
-        size: '1024x1792',
-        quality: 'hd',
-        style: 'vivid',
-      });
-      setGeneratedImage(result.imageUrl);
-      onImageGenerated(companion.id, result.imageUrl);
-    } catch (error) {
-      console.log('Image generation failed:', error);
-    } finally {
-      setIsGeneratingImage(false);
-    }
-  };
 
   const handleSend = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return;
@@ -462,8 +380,6 @@ function ChatScreen({
         <AnimatedCharacter 
           companion={companion} 
           isSpeaking={isSpeaking} 
-          generatedImage={generatedImage}
-          isGenerating={isGeneratingImage}
         />
       </View>
 
@@ -485,7 +401,7 @@ function ChatScreen({
         <View style={[styles.inputRow, { marginBottom: keyboardHeight > 0 ? 8 : insets.bottom + 8 }]}>
           <BlurView intensity={60} tint="dark" style={styles.inputBlur}>
             <LinearGradient
-              colors={['rgba(255,107,157,0.2)', 'rgba(139,92,246,0.2)']}
+              colors={['rgba(255,107,157,0.25)', 'rgba(139,92,246,0.25)']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.inputGradient}
             >
@@ -516,36 +432,14 @@ function ChatScreen({
 
 export default function AlterEgoScreen() {
   const [selectedCompanion, setSelectedCompanion] = useState<CompanionData | null>(null);
-  const [imageCache, setImageCache] = useState<Record<string, string>>({});
   const insets = useSafeAreaInsets();
   const { hapticEnabled } = useUserStore();
-
-  useEffect(() => {
-    loadCachedImages();
-  }, []);
-
-  const loadCachedImages = async () => {
-    try {
-      const cached = await AsyncStorage.getItem(ANIME_CACHE_KEY);
-      if (cached) setImageCache(JSON.parse(cached));
-    } catch {}
-  };
-
-  const handleImageGenerated = async (id: string, url: string) => {
-    const newCache = { ...imageCache, [id]: url };
-    setImageCache(newCache);
-    try {
-      await AsyncStorage.setItem(ANIME_CACHE_KEY, JSON.stringify(newCache));
-    } catch {}
-  };
 
   if (selectedCompanion) {
     return (
       <ChatScreen
         companion={selectedCompanion}
         onBack={() => setSelectedCompanion(null)}
-        cachedImage={imageCache[selectedCompanion.id] || null}
-        onImageGenerated={handleImageGenerated}
       />
     );
   }
@@ -570,7 +464,6 @@ export default function AlterEgoScreen() {
           <CompanionCard
             key={c.id}
             companion={c}
-            cachedImage={imageCache[c.id] || null}
             onPress={() => { if (hapticEnabled) haptics.medium(); setSelectedCompanion(c); }}
           />
         ))}
@@ -592,8 +485,6 @@ const styles = StyleSheet.create({
   cardWrapper: { width: CARD_WIDTH, marginBottom: 16 },
   card: { height: 280, borderRadius: 24, overflow: 'hidden' },
   cardImage: { width: '100%', height: '100%', position: 'absolute' },
-  cardImageFallback: { width: '100%', height: '100%', position: 'absolute', justifyContent: 'center', alignItems: 'center' },
-  cardEmoji: { fontSize: 48 },
   cardOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 180 },
   cardContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14 },
   cardName: { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 2 },
@@ -608,17 +499,11 @@ const styles = StyleSheet.create({
   fireBadge: { position: 'absolute', top: -2, right: -2, backgroundColor: '#FF6B35', borderRadius: 9, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#000' },
   fireBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   characterArea: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 20 },
-  characterWrapper: { width: SCREEN_WIDTH * 0.95, height: SCREEN_HEIGHT * 0.58, justifyContent: 'center', alignItems: 'center' },
-  characterGlow: { position: 'absolute', width: 300, height: 300, borderRadius: 150, bottom: '20%' },
-  characterShadow: { position: 'absolute', bottom: 20, width: 120, height: 20, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 60 },
-  characterContainer: { width: '100%', height: '100%', justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 40 },
+  characterWrapper: { width: SCREEN_WIDTH * 0.85, height: SCREEN_HEIGHT * 0.55, justifyContent: 'center', alignItems: 'center' },
+  characterGlow: { position: 'absolute', width: 250, height: 250, borderRadius: 125, bottom: '25%' },
+  characterShadow: { position: 'absolute', bottom: 30, width: 100, height: 16, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 50 },
+  characterContainer: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
   characterImage: { width: '100%', height: '100%' },
-  fallbackCharacter: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
-  avatarCircle: { width: 140, height: 140, borderRadius: 70, borderWidth: 3, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' },
-  avatarEmoji: { fontSize: 56 },
-  avatarName: { marginTop: 16, fontSize: 24, fontWeight: '700' },
-  generatingContainer: { alignItems: 'center', gap: 16 },
-  generatingText: { color: 'rgba(255,255,255,0.7)', fontSize: 16 },
   speechBubble: { position: 'absolute', bottom: 130, left: 16, right: 70, borderRadius: 20, overflow: 'hidden' },
   speechBubbleBlur: { borderRadius: 20, overflow: 'hidden' },
   speechBubbleGradient: { padding: 16, borderRadius: 20 },
