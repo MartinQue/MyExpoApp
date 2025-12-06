@@ -10,8 +10,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Keyboard,
-  Image,
-  ImageSourcePropType,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -22,13 +20,12 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
-  withDelay,
   withSpring,
   Easing,
   FadeInDown,
-  interpolate,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LottieView from 'lottie-react-native';
 
 import { ChatMessage, sendMessageToAI } from '../chat/ChatHelpers';
 import { useUserStore } from '@/stores/userStore';
@@ -49,7 +46,7 @@ interface CompanionData {
   systemPrompt: string;
   color: string;
   backgroundColor: string;
-  image: ImageSourcePropType;
+  animation: any;
 }
 
 const COMPANIONS: CompanionData[] = [
@@ -62,7 +59,7 @@ const COMPANIONS: CompanionData[] = [
     systemPrompt: 'You are Mika, a free-spirited and loyal friend. Be casual, warm, and supportive.',
     color: '#4ECDC4',
     backgroundColor: '#0a1628',
-    image: require('@/assets/companions/mika.png'),
+    animation: require('@/assets/companions/mika.json'),
   },
   {
     id: 'ani',
@@ -73,7 +70,7 @@ const COMPANIONS: CompanionData[] = [
     systemPrompt: 'You are Ani, sweet and nerdy. Love anime, games, and pop culture. Be enthusiastic and cute.',
     color: '#FF6B9D',
     backgroundColor: '#2a1a2e',
-    image: require('@/assets/companions/ani.png'),
+    animation: require('@/assets/companions/ani.json'),
   },
   {
     id: 'valentine',
@@ -84,7 +81,7 @@ const COMPANIONS: CompanionData[] = [
     systemPrompt: 'You are Valentine, sophisticated and mysterious. Be elegant, charming, with subtle wit.',
     color: '#8B5CF6',
     backgroundColor: '#1a1a2e',
-    image: require('@/assets/companions/valentine.png'),
+    animation: require('@/assets/companions/valentine.json'),
   },
   {
     id: 'sakura',
@@ -95,7 +92,7 @@ const COMPANIONS: CompanionData[] = [
     systemPrompt: 'You are Sakura, warm and nurturing. Be emotionally supportive, gentle, and caring.',
     color: '#F472B6',
     backgroundColor: '#2a1a28',
-    image: require('@/assets/companions/sakura.png'),
+    animation: require('@/assets/companions/sakura.json'),
   },
   {
     id: 'kai',
@@ -106,7 +103,7 @@ const COMPANIONS: CompanionData[] = [
     systemPrompt: 'You are Kai, playful and rebellious but with a heart of gold. Be energetic, spontaneous, and encouraging.',
     color: '#EF4444',
     backgroundColor: '#1a0a0a',
-    image: require('@/assets/companions/kai.png'),
+    animation: require('@/assets/companions/kai.json'),
   },
 ];
 
@@ -117,51 +114,9 @@ function AnimatedCharacter({
   companion: CompanionData; 
   isSpeaking: boolean;
 }) {
-  const breatheScale = useSharedValue(1);
-  const floatY = useSharedValue(0);
-  const swayX = useSharedValue(0);
-  const headTilt = useSharedValue(0);
+  const lottieRef = useRef<LottieView>(null);
   const glowOpacity = useSharedValue(0.3);
   const pulseScale = useSharedValue(1);
-
-  useEffect(() => {
-    breatheScale.value = withRepeat(
-      withSequence(
-        withTiming(1.02, { duration: 2000, easing: Easing.inOut(Easing.sin) }),
-        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.sin) })
-      ),
-      -1,
-      true
-    );
-
-    floatY.value = withRepeat(
-      withSequence(
-        withTiming(-12, { duration: 2500, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 2500, easing: Easing.inOut(Easing.sin) })
-      ),
-      -1,
-      true
-    );
-
-    swayX.value = withRepeat(
-      withSequence(
-        withDelay(500, withTiming(4, { duration: 3000, easing: Easing.inOut(Easing.sin) })),
-        withTiming(-4, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.sin) })
-      ),
-      -1,
-      true
-    );
-
-    headTilt.value = withRepeat(
-      withSequence(
-        withDelay(1000, withTiming(2, { duration: 4000, easing: Easing.inOut(Easing.sin) })),
-        withTiming(-2, { duration: 4000, easing: Easing.inOut(Easing.sin) })
-      ),
-      -1,
-      true
-    );
-  }, []);
 
   useEffect(() => {
     if (isSpeaking) {
@@ -175,7 +130,7 @@ function AnimatedCharacter({
       );
       pulseScale.value = withRepeat(
         withSequence(
-          withTiming(1.04, { duration: 150 }),
+          withTiming(1.05, { duration: 150 }),
           withTiming(1, { duration: 150 })
         ),
         -1,
@@ -187,34 +142,27 @@ function AnimatedCharacter({
     }
   }, [isSpeaking]);
 
-  const characterStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: breatheScale.value * pulseScale.value },
-      { translateY: floatY.value },
-      { translateX: swayX.value },
-      { rotate: `${headTilt.value}deg` },
-    ],
-  }));
-
   const glowStyle = useAnimatedStyle(() => ({
     opacity: glowOpacity.value,
-    transform: [{ scale: 1 + (glowOpacity.value * 0.15) }],
+    transform: [{ scale: 1 + (glowOpacity.value * 0.2) }],
   }));
 
-  const shadowStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scaleX: interpolate(floatY.value, [-12, 0], [0.8, 1]) },
-      { scaleY: interpolate(floatY.value, [-12, 0], [0.5, 0.8]) },
-    ],
-    opacity: interpolate(floatY.value, [-12, 0], [0.15, 0.35]),
+  const containerStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseScale.value }],
   }));
 
   return (
     <View style={styles.characterWrapper}>
       <Animated.View style={[styles.characterGlow, glowStyle, { backgroundColor: companion.color }]} />
-      <Animated.View style={[styles.characterShadow, shadowStyle]} />
-      <Animated.View style={[styles.characterContainer, characterStyle]}>
-        <Image source={companion.image} style={styles.characterImage} resizeMode="contain" />
+      <Animated.View style={[styles.lottieContainer, containerStyle]}>
+        <LottieView
+          ref={lottieRef}
+          source={companion.animation}
+          autoPlay
+          loop
+          speed={isSpeaking ? 1.5 : 1}
+          style={styles.lottieAnimation}
+        />
       </Animated.View>
     </View>
   );
@@ -256,7 +204,14 @@ function CompanionCard({
       style={styles.cardWrapper}
     >
       <Animated.View style={[styles.card, { backgroundColor: companion.backgroundColor }, cardStyle]}>
-        <Image source={companion.image} style={styles.cardImage} resizeMode="cover" />
+        <View style={styles.cardLottieWrapper}>
+          <LottieView
+            source={companion.animation}
+            autoPlay
+            loop
+            style={styles.cardLottie}
+          />
+        </View>
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.95)']} style={styles.cardOverlay} />
         <View style={styles.cardContent}>
           <Text style={styles.cardName}>{companion.name}</Text>
@@ -484,7 +439,8 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 100 },
   cardWrapper: { width: CARD_WIDTH, marginBottom: 16 },
   card: { height: 280, borderRadius: 24, overflow: 'hidden' },
-  cardImage: { width: '100%', height: '100%', position: 'absolute' },
+  cardLottieWrapper: { width: '100%', height: '100%', position: 'absolute', justifyContent: 'center', alignItems: 'center' },
+  cardLottie: { width: '120%', height: '120%' },
   cardOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 180 },
   cardContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14 },
   cardName: { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 2 },
@@ -499,11 +455,10 @@ const styles = StyleSheet.create({
   fireBadge: { position: 'absolute', top: -2, right: -2, backgroundColor: '#FF6B35', borderRadius: 9, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#000' },
   fireBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   characterArea: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 20 },
-  characterWrapper: { width: SCREEN_WIDTH * 0.85, height: SCREEN_HEIGHT * 0.55, justifyContent: 'center', alignItems: 'center' },
-  characterGlow: { position: 'absolute', width: 250, height: 250, borderRadius: 125, bottom: '25%' },
-  characterShadow: { position: 'absolute', bottom: 30, width: 100, height: 16, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 50 },
-  characterContainer: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
-  characterImage: { width: '100%', height: '100%' },
+  characterWrapper: { width: SCREEN_WIDTH * 0.9, height: SCREEN_HEIGHT * 0.55, justifyContent: 'center', alignItems: 'center' },
+  characterGlow: { position: 'absolute', width: 280, height: 280, borderRadius: 140 },
+  lottieContainer: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
+  lottieAnimation: { width: '100%', height: '100%' },
   speechBubble: { position: 'absolute', bottom: 130, left: 16, right: 70, borderRadius: 20, overflow: 'hidden' },
   speechBubbleBlur: { borderRadius: 20, overflow: 'hidden' },
   speechBubbleGradient: { padding: 16, borderRadius: 20 },
