@@ -136,8 +136,8 @@ function AnimatedCharacter({
   useEffect(() => {
     breatheScale.value = withRepeat(
       withSequence(
-        withTiming(1.02, { duration: 2000, easing: Easing.inOut(Easing.sine) }),
-        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.sine) })
+        withTiming(1.02, { duration: 2000, easing: Easing.inOut(Easing.sin) }),
+        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
       true
@@ -145,8 +145,8 @@ function AnimatedCharacter({
 
     floatY.value = withRepeat(
       withSequence(
-        withTiming(-8, { duration: 2500, easing: Easing.inOut(Easing.sine) }),
-        withTiming(0, { duration: 2500, easing: Easing.inOut(Easing.sine) })
+        withTiming(-8, { duration: 2500, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 2500, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
       true
@@ -154,9 +154,9 @@ function AnimatedCharacter({
 
     swayX.value = withRepeat(
       withSequence(
-        withDelay(500, withTiming(3, { duration: 3000, easing: Easing.inOut(Easing.sine) })),
-        withTiming(-3, { duration: 3000, easing: Easing.inOut(Easing.sine) }),
-        withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.sine) })
+        withDelay(500, withTiming(3, { duration: 3000, easing: Easing.inOut(Easing.sin) })),
+        withTiming(-3, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
       true
@@ -164,8 +164,8 @@ function AnimatedCharacter({
 
     headTilt.value = withRepeat(
       withSequence(
-        withDelay(1000, withTiming(2, { duration: 4000, easing: Easing.inOut(Easing.sine) })),
-        withTiming(-2, { duration: 4000, easing: Easing.inOut(Easing.sine) })
+        withDelay(1000, withTiming(2, { duration: 4000, easing: Easing.inOut(Easing.sin) })),
+        withTiming(-2, { duration: 4000, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
       true
@@ -173,8 +173,8 @@ function AnimatedCharacter({
 
     hairFloat.value = withRepeat(
       withSequence(
-        withTiming(1, { duration: 1800, easing: Easing.inOut(Easing.sine) }),
-        withTiming(-1, { duration: 1800, easing: Easing.inOut(Easing.sine) })
+        withTiming(1, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+        withTiming(-1, { duration: 1800, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
       true
@@ -277,8 +277,8 @@ function CompanionCard({
   useEffect(() => {
     cardFloat.value = withRepeat(
       withSequence(
-        withTiming(-3, { duration: 2000 + Math.random() * 1000, easing: Easing.inOut(Easing.sine) }),
-        withTiming(0, { duration: 2000 + Math.random() * 1000, easing: Easing.inOut(Easing.sine) })
+        withTiming(-3, { duration: 2000 + Math.random() * 1000, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 2000 + Math.random() * 1000, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
       true
@@ -393,7 +393,7 @@ function ChatScreen({
     setIsLoading(true);
 
     try {
-      const response = await sendMessageToAI(text, messages, companion.systemPrompt, companion.name);
+      const response = await sendMessageToAI(text, { systemPrompt: companion.systemPrompt });
       const aiMsg: ChatMessage = {
         _id: `ai_${Date.now()}`, text: response.text || "I'm here for you.", createdAt: new Date(), user: { _id: 2, name: companion.name },
       };
