@@ -27,7 +27,6 @@ import Animated, {
   Easing,
   FadeInDown,
   interpolate,
-  runOnJS,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -350,8 +349,8 @@ function ChatScreen({
   const [generatedImage, setGeneratedImage] = useState<string | null>(cachedImage);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const { isRecording, startRecording, stopRecording } = useVoiceContext();
-  const { isPlaying: isSpeaking, speakWithElevenLabs } = useElevenLabs();
+  const { isListening: isRecording, startRecording, stopRecording } = useVoiceContext();
+  const { isSpeaking, speak: speakWithElevenLabs } = useElevenLabs();
 
   useEffect(() => {
     if (!cachedImage && !generatedImage && !isGeneratingImage) {
