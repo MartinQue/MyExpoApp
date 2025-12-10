@@ -3,7 +3,6 @@
 
 import React, { createContext, useContext, useMemo } from 'react';
 import { useUserStore } from '@/stores/userStore';
-import { Colors } from '@/constants/Theme';
 
 export type ThemeMode = 'light' | 'dark';
 

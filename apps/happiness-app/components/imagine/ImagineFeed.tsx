@@ -7,10 +7,8 @@ import {
   Pressable,
   Dimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Theme';
 import { MediaCard } from './MediaCard';
-import haptics from '@/lib/haptics';
 
 const { width } = Dimensions.get('window');
 

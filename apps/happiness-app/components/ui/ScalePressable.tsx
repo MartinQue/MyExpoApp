@@ -5,7 +5,7 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from 'react-native-reanimated';
-import haptics from '@/lib/haptics';
+import { selection as hapticSelection, button as hapticButton } from '@/lib/haptics';
 
 interface ScalePressableProps extends Omit<PressableProps, 'children'> {
   scaleTo?: number;
@@ -33,7 +33,7 @@ export function ScalePressable({
   const handlePressIn = () => {
     scale.value = withSpring(scaleTo, { damping: 10, stiffness: 300 });
     opacity.value = withSpring(activeOpacity);
-    haptics.selection();
+    hapticSelection();
   };
 
   const handlePressOut = () => {
@@ -46,7 +46,7 @@ export function ScalePressable({
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={(e) => {
-        haptics.button();
+        hapticButton();
         onPress?.(e);
       }}
       {...props}

@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Theme';
-import haptics from '@/lib/haptics';
+import { selection as hapticSelection } from '@/lib/haptics';
 
 interface ImagineControlsProps {
   selectedModel: string;
@@ -43,7 +43,7 @@ export function ImagineControls({
                 selectedModel === model.id && styles.optionButtonActive,
               ]}
               onPress={() => {
-                haptics.selection();
+                hapticSelection();
                 setSelectedModel(model.id);
               }}
             >
@@ -77,7 +77,7 @@ export function ImagineControls({
                 aspectRatio === ratio.id && styles.optionButtonActive,
               ]}
               onPress={() => {
-                haptics.selection();
+                hapticSelection();
                 setAspectRatio(ratio.id);
               }}
             >

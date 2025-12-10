@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState, memo } from 'react';
 import {
   View,
   Text,
@@ -8,20 +8,22 @@ import {
   Modal,
   TextInput,
   Image,
-  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as haptics from '@/lib/haptics';
+import {
+  success as hapticSuccess,
+  button as hapticButton,
+  error as hapticError,
+  medium as hapticMedium,
+} from '@/lib/haptics';
 import { MotiView } from 'moti';
 import { usePlannerStore, Plan } from '@/stores/plannerStore';
 import { Colors } from '@/constants/Theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { sendMessageToAI } from '@/components/chat/ChatHelpers';
-
-const { width } = Dimensions.get('window');
 
 // Motivational quotes with images
 const MOTIVATIONAL_CONTENT = [
@@ -91,70 +93,74 @@ export default function PlannerTab() {
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
 
   // Calculate goal synergies
-  const getGoalSynergies = (plan: Plan) => {
-    const synergies: { goal: Plan; connection: string }[] = [];
+  const getGoalSynergies = useCallback(
+    (plan: Plan) => {
+      const synergies: { goal: Plan; connection: string }[] = [];
 
-    plans.forEach((otherPlan) => {
-      if (otherPlan.id === plan.id) return;
+      plans.forEach((otherPlan) => {
+        if (otherPlan.id === plan.id) return;
 
-      // Simple synergy detection based on keywords
-      const healthKeywords = [
-        'health',
-        'fitness',
-        'gym',
-        'workout',
-        'diet',
-        'weight',
-      ];
-      const financeKeywords = [
-        'finance',
-        'money',
-        'invest',
-        'save',
-        'budget',
-        'debt',
-      ];
-      const productivityKeywords = [
-        'productivity',
-        'work',
-        'career',
-        'study',
-        'learn',
-      ];
+        // Simple synergy detection based on keywords
+        const healthKeywords = [
+          'health',
+          'fitness',
+          'gym',
+          'workout',
+          'diet',
+          'weight',
+        ];
+        const financeKeywords = [
+          'finance',
+          'money',
+          'invest',
+          'save',
+          'budget',
+          'debt',
+        ];
+        const productivityKeywords = [
+          'productivity',
+          'work',
+          'career',
+          'study',
+          'learn',
+        ];
 
-      const planTitle = plan.title.toLowerCase();
-      const otherTitle = otherPlan.title.toLowerCase();
+        const planTitle = plan.title.toLowerCase();
+        const otherTitle = otherPlan.title.toLowerCase();
 
-      const planIsHealth = healthKeywords.some((k) => planTitle.includes(k));
-      const otherIsHealth = healthKeywords.some((k) => otherTitle.includes(k));
-      const planIsFinance = financeKeywords.some((k) => planTitle.includes(k));
-      const otherIsFinance = financeKeywords.some((k) =>
-        otherTitle.includes(k)
-      );
-      const planIsProd = productivityKeywords.some((k) =>
-        planTitle.includes(k)
-      );
-      const otherIsProd = productivityKeywords.some((k) =>
-        otherTitle.includes(k)
-      );
+        const planIsHealth = healthKeywords.some((k) => planTitle.includes(k));
+        const otherIsFinance = financeKeywords.some((k) =>
+          otherTitle.includes(k)
+        );
+        const planIsProd = productivityKeywords.some((k) =>
+          planTitle.includes(k)
+        );
+        const otherIsProd = productivityKeywords.some((k) =>
+          otherTitle.includes(k)
+        );
 
-      if (planIsHealth && otherIsProd) {
-        synergies.push({
-          goal: otherPlan,
-          connection: 'Energy → Productivity',
-        });
-      } else if (planIsHealth && otherIsFinance) {
-        synergies.push({ goal: otherPlan, connection: 'Discipline → Savings' });
-      } else if (planIsProd && otherIsFinance) {
-        synergies.push({ goal: otherPlan, connection: 'Career → Income' });
-      }
-    });
+        if (planIsHealth && otherIsProd) {
+          synergies.push({
+            goal: otherPlan,
+            connection: 'Energy → Productivity',
+          });
+        } else if (planIsHealth && otherIsFinance) {
+          synergies.push({
+            goal: otherPlan,
+            connection: 'Discipline → Savings',
+          });
+        } else if (planIsProd && otherIsFinance) {
+          synergies.push({ goal: otherPlan, connection: 'Career → Income' });
+        }
+      });
 
-    return synergies.slice(0, 2);
-  };
+      return synergies.slice(0, 2);
+    },
+    [plans]
+  );
 
   // Get week progress
-  const getWeekProgress = (plan: Plan) => {
+  const getWeekProgress = useCallback((plan: Plan) => {
     // Simulated week progress (would come from actual tracking in production)
     const progress = WEEK_DAYS.map((_, index) => {
       if (index < new Date().getDay()) {
@@ -163,28 +169,9 @@ export default function PlannerTab() {
       return null; // Future days
     });
     return progress;
-  };
+  }, []);
 
   // Get relevant success story
-  const getRelevantStory = (plan: Plan) => {
-    const title = plan.title.toLowerCase();
-    if (
-      title.includes('fitness') ||
-      title.includes('health') ||
-      title.includes('weight')
-    ) {
-      return SUCCESS_STORIES[0];
-    }
-    if (
-      title.includes('finance') ||
-      title.includes('debt') ||
-      title.includes('save')
-    ) {
-      return SUCCESS_STORIES[1];
-    }
-    return SUCCESS_STORIES[2];
-  };
-
   const handleCreateGoal = () => {
     if (!newGoalTitle.trim()) return;
 
@@ -201,14 +188,14 @@ export default function PlannerTab() {
     setNewGoalTitle('');
     setNewGoalDescription('');
     setShowCreateModal(false);
-    haptics.success();
+    hapticSuccess();
   };
 
   const handleAIPlanGeneration = async () => {
     if (!aiPlanRequest.trim()) return;
 
     setIsGeneratingPlan(true);
-    haptics.button();
+    hapticButton();
 
     try {
       const systemPrompt = `You are a goal planning assistant. When a user asks you to create a plan, respond with a structured plan in this JSON format:
@@ -263,10 +250,10 @@ Only respond with valid JSON, no other text.`;
 
       setAiPlanRequest('');
       setShowAIPlanModal(false);
-      haptics.success();
+      hapticSuccess();
     } catch (error) {
       console.error('AI plan generation error:', error);
-      haptics.error();
+      hapticError();
       // Still create a basic plan
       addPlan({
         title: aiPlanRequest,
@@ -284,15 +271,18 @@ Only respond with valid JSON, no other text.`;
     }
   };
 
-  const handlePlanPress = (id: string) => {
-    haptics.button();
-    setSelectedPlanId(id);
-  };
+  const handlePlanPress = useCallback(
+    (id: string) => {
+      hapticButton();
+      setSelectedPlanId(id);
+    },
+    [setSelectedPlanId]
+  );
 
-  const handleBack = () => {
-    haptics.button();
+  const handleBack = useCallback(() => {
+    hapticButton();
     setSelectedPlanId(null);
-  };
+  }, [setSelectedPlanId]);
 
   // Render Goal Synergy Map
   const renderSynergyMap = () => {
@@ -421,163 +411,185 @@ Only respond with valid JSON, no other text.`;
   };
 
   // Render Goal Card
-  const renderGoalCard = (plan: Plan, index: number) => {
-    const weekProgress = getWeekProgress(plan);
-    const synergies = getGoalSynergies(plan);
+  const renderGoalCard = useCallback(
+    (plan: Plan, index: number) => {
+      const weekProgress = getWeekProgress(plan);
+      const synergies = getGoalSynergies(plan);
 
-    return (
-      <MotiView
-        key={plan.id}
-        from={{ opacity: 0, translateY: 20 }}
-        animate={{ opacity: 1, translateY: 0 }}
-        transition={{ type: 'timing', duration: 300, delay: index * 100 }}
-      >
-        <Pressable
-          style={[
-            styles.planCard,
-            {
-              backgroundColor: isDark ? colors.surface : 'white',
-              borderColor: isDark ? colors.border : 'transparent',
-              borderWidth: isDark ? 1 : 0,
-            },
-          ]}
-          onPress={() => handlePlanPress(plan.id)}
+      return (
+        <MotiView
+          key={plan.id}
+          from={{ opacity: 0, translateY: 20 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: 'timing', duration: 300, delay: index * 100 }}
         >
-          <View style={styles.planHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.planTitle, { color: colors.text }]}>
-                {plan.title}
-              </Text>
-              <Text
-                style={[styles.planDescription, { color: colors.textMuted }]}
-              >
-                {plan.description}
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={colors.textMuted}
-            />
-          </View>
-
-          {/* Progress */}
-          <View style={styles.progressContainer}>
-            <View style={styles.progressLabelRow}>
-              <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
-                Progress
-              </Text>
-              <Text style={[styles.progressValue, { color: colors.text }]}>
-                {plan.progress}%
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.progressBarBg,
-                {
-                  backgroundColor: isDark ? colors.glassBackground : '#f3f4f6',
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.progressBarFill,
-                  {
-                    width: `${plan.progress}%`,
-                    backgroundColor: colors.success,
-                  },
-                ]}
+          <Pressable
+            style={[
+              styles.planCard,
+              {
+                backgroundColor: isDark ? colors.surface : 'white',
+                borderColor: isDark ? colors.border : 'transparent',
+                borderWidth: isDark ? 1 : 0,
+              },
+            ]}
+            onPress={() => handlePlanPress(plan.id)}
+          >
+            <View style={styles.planHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.planTitle, { color: colors.text }]}>
+                  {plan.title}
+                </Text>
+                <Text
+                  style={[styles.planDescription, { color: colors.textMuted }]}
+                >
+                  {plan.description}
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={colors.textMuted}
               />
             </View>
-          </View>
 
-          {/* Week Timeline */}
-          <View style={styles.weekTimeline}>
-            {WEEK_DAYS.map((day, dayIndex) => (
-              <View key={day} style={styles.dayColumn}>
-                <Text style={[styles.dayLabel, { color: colors.textMuted }]}>
-                  {day}
+            {/* Progress */}
+            <View style={styles.progressContainer}>
+              <View style={styles.progressLabelRow}>
+                <Text
+                  style={[styles.progressLabel, { color: colors.textMuted }]}
+                >
+                  Progress
                 </Text>
-                <View
-                  style={[
-                    styles.dayDot,
-                    weekProgress[dayIndex] === true
-                      ? styles.dayCompleted
-                      : weekProgress[dayIndex] === false
-                      ? styles.dayMissed
-                      : [
-                          styles.dayFuture,
-                          {
-                            backgroundColor: isDark
-                              ? colors.glassBackground
-                              : '#e5e7eb',
-                          },
-                        ],
-                  ]}
-                >
-                  {weekProgress[dayIndex] === true && (
-                    <Ionicons name="checkmark" size={10} color="white" />
-                  )}
-                </View>
+                <Text style={[styles.progressValue, { color: colors.text }]}>
+                  {plan.progress}%
+                </Text>
               </View>
-            ))}
-          </View>
-
-          {/* Synergies */}
-          {synergies.length > 0 && (
-            <View style={styles.synergiesRow}>
-              {synergies.map((synergy, sIndex) => (
+              <View
+                style={[
+                  styles.progressBarBg,
+                  {
+                    backgroundColor: isDark
+                      ? colors.glassBackground
+                      : '#f3f4f6',
+                  },
+                ]}
+              >
                 <View
-                  key={sIndex}
                   style={[
-                    styles.synergyBadge,
-                    { backgroundColor: `${colors.primary}15` },
+                    styles.progressBarFill,
+                    {
+                      width: `${plan.progress}%`,
+                      backgroundColor: colors.success,
+                    },
                   ]}
-                >
-                  <Text
-                    style={[styles.synergyBadgeText, { color: colors.primary }]}
-                  >
-                    {synergy.connection}
+                />
+              </View>
+            </View>
+
+            {/* Week Timeline */}
+            <View style={styles.weekTimeline}>
+              {WEEK_DAYS.map((day, dayIndex) => (
+                <View key={day} style={styles.dayColumn}>
+                  <Text style={[styles.dayLabel, { color: colors.textMuted }]}>
+                    {day}
                   </Text>
+                  <View
+                    style={[
+                      styles.dayDot,
+                      weekProgress[dayIndex] === true
+                        ? styles.dayCompleted
+                        : weekProgress[dayIndex] === false
+                        ? styles.dayMissed
+                        : [
+                            styles.dayFuture,
+                            {
+                              backgroundColor: isDark
+                                ? colors.glassBackground
+                                : '#e5e7eb',
+                            },
+                          ],
+                    ]}
+                  >
+                    {weekProgress[dayIndex] === true && (
+                      <Ionicons name="checkmark" size={10} color="white" />
+                    )}
+                  </View>
                 </View>
               ))}
             </View>
-          )}
 
-          {/* Next Task */}
-          <View
-            style={[
-              styles.nextTaskContainer,
-              { backgroundColor: isDark ? `${colors.success}15` : '#f0fdf4' },
-            ]}
-          >
-            <Ionicons
-              name="time-outline"
-              size={16}
-              color={colors.success}
-              style={{ marginTop: 2 }}
-            />
-            <View style={{ marginLeft: 8, flex: 1 }}>
-              <Text
-                style={[
-                  styles.nextTaskLabel,
-                  { color: isDark ? colors.success : '#166534' },
-                ]}
-              >
-                Next up
-              </Text>
-              <Text style={[styles.nextTaskTitle, { color: colors.text }]}>
-                {plan.nextTask}
-              </Text>
-              <Text style={[styles.nextTaskDate, { color: colors.success }]}>
-                {plan.dueDate}
-              </Text>
+            {/* Synergies */}
+            {synergies.length > 0 && (
+              <View style={styles.synergiesRow}>
+                {synergies.map((synergy, sIndex) => (
+                  <View
+                    key={sIndex}
+                    style={[
+                      styles.synergyBadge,
+                      { backgroundColor: `${colors.primary}15` },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.synergyBadgeText,
+                        { color: colors.primary },
+                      ]}
+                    >
+                      {synergy.connection}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Next Task */}
+            <View
+              style={[
+                styles.nextTaskContainer,
+                { backgroundColor: isDark ? `${colors.success}15` : '#f0fdf4' },
+              ]}
+            >
+              <Ionicons
+                name="time-outline"
+                size={16}
+                color={colors.success}
+                style={{ marginTop: 2 }}
+              />
+              <View style={{ marginLeft: 8, flex: 1 }}>
+                <Text
+                  style={[
+                    styles.nextTaskLabel,
+                    { color: isDark ? colors.success : '#166534' },
+                  ]}
+                >
+                  Next up
+                </Text>
+                <Text style={[styles.nextTaskTitle, { color: colors.text }]}>
+                  {plan.nextTask}
+                </Text>
+                <Text style={[styles.nextTaskDate, { color: colors.success }]}>
+                  {plan.dueDate}
+                </Text>
+              </View>
             </View>
-          </View>
-        </Pressable>
-      </MotiView>
-    );
-  };
+          </Pressable>
+        </MotiView>
+      );
+    },
+    [
+      colors.border,
+      colors.glassBackground,
+      colors.primary,
+      colors.success,
+      colors.surface,
+      colors.text,
+      colors.textMuted,
+      getGoalSynergies,
+      getWeekProgress,
+      handlePlanPress,
+      isDark,
+    ]
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -716,7 +728,7 @@ Only respond with valid JSON, no other text.`;
               ]}
               onPress={() => {
                 setViewMode('overview');
-                haptics.button();
+                hapticButton();
               }}
             >
               <Ionicons
@@ -744,7 +756,7 @@ Only respond with valid JSON, no other text.`;
               ]}
               onPress={() => {
                 setViewMode('timeline');
-                haptics.button();
+                hapticButton();
               }}
             >
               <Ionicons
@@ -809,7 +821,7 @@ Only respond with valid JSON, no other text.`;
             <Pressable
               style={[styles.addButton, styles.addButtonSecondary]}
               onPress={() => {
-                haptics.button();
+                hapticButton();
                 setShowAIPlanModal(true);
               }}
             >
@@ -837,7 +849,7 @@ Only respond with valid JSON, no other text.`;
             <Pressable
               style={styles.addButton}
               onPress={() => {
-                haptics.button();
+                hapticButton();
                 setShowCreateModal(true);
               }}
             >
@@ -911,7 +923,7 @@ Only respond with valid JSON, no other text.`;
                   <Pressable
                     style={styles.modalButtonCancel}
                     onPress={() => {
-                      haptics.button();
+                      hapticButton();
                       setShowAIPlanModal(false);
                       setAiPlanRequest('');
                     }}
@@ -1017,7 +1029,7 @@ Only respond with valid JSON, no other text.`;
                   <Pressable
                     style={styles.modalButtonCancel}
                     onPress={() => {
-                      haptics.button();
+                      hapticButton();
                       setShowCreateModal(false);
                     }}
                   >
@@ -1066,361 +1078,372 @@ Only respond with valid JSON, no other text.`;
 }
 
 // Plan Detail View Component
-function PlanDetailView({ plan, onBack }: { plan: Plan; onBack: () => void }) {
-  const { colors, isDark } = useTheme();
-  const { updateProgress, completeMilestone, startMilestone } =
-    usePlannerStore();
-  const [localProgress, setLocalProgress] = useState(plan.progress);
-  const [showProgressInput, setShowProgressInput] = useState(false);
-  const successStory =
-    SUCCESS_STORIES[Math.floor(Math.random() * SUCCESS_STORIES.length)];
+const PlanDetailView = memo(
+  ({ plan, onBack }: { plan: Plan; onBack: () => void }) => {
+    const { updateProgress, completeMilestone, startMilestone } =
+      usePlannerStore();
+    const [localProgress, setLocalProgress] = useState(plan.progress);
+    const [showProgressInput, setShowProgressInput] = useState(false);
+    const successStory =
+      SUCCESS_STORIES[Math.floor(Math.random() * SUCCESS_STORIES.length)];
 
-  const handleProgressUpdate = (newProgress: number) => {
-    haptics.medium();
-    setLocalProgress(newProgress);
-    updateProgress(plan.id, newProgress);
-  };
+    const handleProgressUpdate = (newProgress: number) => {
+      hapticMedium();
+      setLocalProgress(newProgress);
+      updateProgress(plan.id, newProgress);
+    };
 
-  const handleQuickProgress = (increment: number) => {
-    const newProgress = Math.max(0, Math.min(100, localProgress + increment));
-    handleProgressUpdate(newProgress);
-  };
+    const handleQuickProgress = (increment: number) => {
+      const newProgress = Math.max(0, Math.min(100, localProgress + increment));
+      handleProgressUpdate(newProgress);
+    };
 
-  return (
-    <View style={styles.detailContainer}>
-      {/* Header with Image */}
-      <View style={styles.detailHeaderWrapper}>
-        <Image
-          source={{
-            uri: MOTIVATIONAL_CONTENT[
-              Math.floor(Math.random() * MOTIVATIONAL_CONTENT.length)
-            ].image,
-          }}
-          style={styles.detailHeaderImage}
-        />
-        <LinearGradient
-          colors={['transparent', 'rgba(22, 163, 74, 0.9)']}
-          style={styles.detailHeaderOverlay}
-        />
-        <SafeAreaView edges={['top']} style={styles.detailHeaderContent}>
-          <Pressable onPress={onBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-            <Text style={styles.backButtonText}>Back</Text>
-          </Pressable>
-
-          <View style={styles.detailTitleSection}>
-            <Text style={styles.detailTitle}>{plan.title}</Text>
-            <Text style={styles.detailDescription}>{plan.description}</Text>
-
-            <View style={styles.detailProgressCard}>
-              <View style={styles.progressLabelRow}>
-                <Text style={styles.detailProgressLabel}>Overall Progress</Text>
-                <Text style={styles.detailProgressValue}>{localProgress}%</Text>
-              </View>
-              <View style={styles.detailProgressBarBg}>
-                <View
-                  style={[
-                    styles.detailProgressBarFill,
-                    { width: `${localProgress}%` },
-                  ]}
-                />
-              </View>
-              {/* Quick Progress Update Buttons */}
-              <View style={styles.quickProgressRow}>
-                <Pressable
-                  style={[
-                    styles.quickProgressButton,
-                    { backgroundColor: 'rgba(255,255,255,0.2)' },
-                  ]}
-                  onPress={() => handleQuickProgress(-10)}
-                >
-                  <Ionicons name="remove" size={16} color="white" />
-                  <Text style={styles.quickProgressText}>-10%</Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.quickProgressButton,
-                    { backgroundColor: 'rgba(255,255,255,0.2)' },
-                  ]}
-                  onPress={() => handleQuickProgress(-5)}
-                >
-                  <Ionicons name="remove" size={14} color="white" />
-                  <Text style={styles.quickProgressText}>-5%</Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.quickProgressButton,
-                    { backgroundColor: 'rgba(34, 197, 94, 0.3)' },
-                  ]}
-                  onPress={() => setShowProgressInput(!showProgressInput)}
-                >
-                  <Ionicons name="create-outline" size={16} color="white" />
-                  <Text style={styles.quickProgressText}>Set</Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.quickProgressButton,
-                    { backgroundColor: 'rgba(34, 197, 94, 0.3)' },
-                  ]}
-                  onPress={() => handleQuickProgress(5)}
-                >
-                  <Ionicons name="add" size={14} color="white" />
-                  <Text style={styles.quickProgressText}>+5%</Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.quickProgressButton,
-                    { backgroundColor: 'rgba(34, 197, 94, 0.3)' },
-                  ]}
-                  onPress={() => handleQuickProgress(10)}
-                >
-                  <Ionicons name="add" size={16} color="white" />
-                  <Text style={styles.quickProgressText}>+10%</Text>
-                </Pressable>
-              </View>
-              {showProgressInput && (
-                <View style={styles.progressInputContainer}>
-                  <TextInput
-                    style={[
-                      styles.progressInput,
-                      { color: 'white', borderColor: 'rgba(255,255,255,0.3)' },
-                    ]}
-                    value={localProgress.toString()}
-                    onChangeText={(text) => {
-                      const num = parseInt(text) || 0;
-                      const clamped = Math.max(0, Math.min(100, num));
-                      setLocalProgress(clamped);
-                    }}
-                    keyboardType="number-pad"
-                    maxLength={3}
-                    placeholder="0-100"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
-                  />
-                  <Pressable
-                    style={[
-                      styles.progressSaveButton,
-                      { backgroundColor: '#22c55e' },
-                    ]}
-                    onPress={() => {
-                      handleProgressUpdate(localProgress);
-                      setShowProgressInput(false);
-                    }}
-                  >
-                    <Text style={styles.progressSaveText}>Save</Text>
-                  </Pressable>
-                </View>
-              )}
-            </View>
-          </View>
-        </SafeAreaView>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.detailScrollContent}>
-        {/* Motivation Card */}
-        <LinearGradient
-          colors={['#f97316', '#ec4899']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.motivationCard}
-        >
-          <Ionicons
-            name="heart"
-            size={20}
-            color="white"
-            style={{ marginRight: 12 }}
+    return (
+      <View style={styles.detailContainer}>
+        {/* Header with Image */}
+        <View style={styles.detailHeaderWrapper}>
+          <Image
+            source={{
+              uri: MOTIVATIONAL_CONTENT[
+                Math.floor(Math.random() * MOTIVATIONAL_CONTENT.length)
+              ].image,
+            }}
+            style={styles.detailHeaderImage}
           />
-          <Text style={styles.motivationText}>
-            &quot;
-            {plan.motivationQuote || 'Every journey begins with a single step.'}
-            &quot;
-          </Text>
-        </LinearGradient>
+          <LinearGradient
+            colors={['transparent', 'rgba(22, 163, 74, 0.9)']}
+            style={styles.detailHeaderOverlay}
+          />
+          <SafeAreaView edges={['top']} style={styles.detailHeaderContent}>
+            <Pressable onPress={onBack} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color="white" />
+              <Text style={styles.backButtonText}>Back</Text>
+            </Pressable>
 
-        {/* Week Timeline */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons
-              name="calendar-outline"
-              size={20}
-              color="#16a34a"
-              style={{ marginRight: 8 }}
-            />
-            <Text style={styles.cardTitle}>This Week</Text>
-          </View>
-          <View style={styles.weekTimelineLarge}>
-            {WEEK_DAYS.map((day, index) => {
-              const isComplete = index < 3; // Simulation
-              const isToday = index === new Date().getDay() - 1;
-              return (
-                <View key={day} style={styles.dayColumnLarge}>
-                  <Text
-                    style={[
-                      styles.dayLabelLarge,
-                      isToday && styles.dayLabelToday,
-                    ]}
-                  >
-                    {day}
+            <View style={styles.detailTitleSection}>
+              <Text style={styles.detailTitle}>{plan.title}</Text>
+              <Text style={styles.detailDescription}>{plan.description}</Text>
+
+              <View style={styles.detailProgressCard}>
+                <View style={styles.progressLabelRow}>
+                  <Text style={styles.detailProgressLabel}>
+                    Overall Progress
                   </Text>
+                  <Text style={styles.detailProgressValue}>
+                    {localProgress}%
+                  </Text>
+                </View>
+                <View style={styles.detailProgressBarBg}>
                   <View
                     style={[
-                      styles.dayDotLarge,
-                      isComplete
-                        ? styles.dayCompletedLarge
-                        : isToday
-                        ? styles.dayTodayLarge
-                        : styles.dayFutureLarge,
+                      styles.detailProgressBarFill,
+                      { width: `${localProgress}%` },
                     ]}
-                  >
-                    {isComplete && (
-                      <Ionicons name="checkmark" size={16} color="white" />
-                    )}
-                    {isToday && !isComplete && (
-                      <View style={styles.todayInner} />
-                    )}
-                  </View>
+                  />
                 </View>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Next Task */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons
-              name="time-outline"
-              size={20}
-              color="#16a34a"
-              style={{ marginRight: 8 }}
-            />
-            <Text style={styles.cardTitle}>What&apos;s Next</Text>
-          </View>
-          <Text style={styles.cardBodyText}>{plan.nextTask}</Text>
-          <View style={styles.dateBadge}>
-            <Ionicons
-              name="calendar-outline"
-              size={14}
-              color="#374151"
-              style={{ marginRight: 4 }}
-            />
-            <Text style={styles.dateBadgeText}>{plan.dueDate}</Text>
-          </View>
-        </View>
-
-        {/* Research AI - Success Stories */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons
-              name="bulb"
-              size={20}
-              color="#f59e0b"
-              style={{ marginRight: 8 }}
-            />
-            <Text style={styles.cardTitle}>People Like You Succeeded</Text>
-          </View>
-          <View style={styles.successStoryCard}>
-            <Text style={styles.successAvatar}>{successStory.avatar}</Text>
-            <View style={styles.successContent}>
-              <Text style={styles.successTitle}>{successStory.title}</Text>
-              <Text style={styles.successContext}>{successStory.context}</Text>
-              <Text style={styles.successSource}>
-                From {successStory.source}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Milestones */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Milestones</Text>
-          </View>
-          {plan.milestones && plan.milestones.length > 0 ? (
-            <View style={styles.milestonesList}>
-              {plan.milestones.map((m, i) => (
-                <View key={m.id} style={styles.milestoneItem}>
-                  <View style={styles.milestoneIcon}>
-                    {m.status === 'completed' ? (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={24}
-                        color="#22c55e"
-                      />
-                    ) : m.status === 'in-progress' ? (
-                      <Ionicons name="time" size={24} color="#3b82f6" />
-                    ) : (
-                      <Ionicons
-                        name="ellipse-outline"
-                        size={24}
-                        color="#d1d5db"
-                      />
-                    )}
-                  </View>
-                  <View style={styles.milestoneContent}>
+                {/* Quick Progress Update Buttons */}
+                <View style={styles.quickProgressRow}>
+                  <Pressable
+                    style={[
+                      styles.quickProgressButton,
+                      { backgroundColor: 'rgba(255,255,255,0.2)' },
+                    ]}
+                    onPress={() => handleQuickProgress(-10)}
+                  >
+                    <Ionicons name="remove" size={16} color="white" />
+                    <Text style={styles.quickProgressText}>-10%</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.quickProgressButton,
+                      { backgroundColor: 'rgba(255,255,255,0.2)' },
+                    ]}
+                    onPress={() => handleQuickProgress(-5)}
+                  >
+                    <Ionicons name="remove" size={14} color="white" />
+                    <Text style={styles.quickProgressText}>-5%</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.quickProgressButton,
+                      { backgroundColor: 'rgba(34, 197, 94, 0.3)' },
+                    ]}
+                    onPress={() => setShowProgressInput(!showProgressInput)}
+                  >
+                    <Ionicons name="create-outline" size={16} color="white" />
+                    <Text style={styles.quickProgressText}>Set</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.quickProgressButton,
+                      { backgroundColor: 'rgba(34, 197, 94, 0.3)' },
+                    ]}
+                    onPress={() => handleQuickProgress(5)}
+                  >
+                    <Ionicons name="add" size={14} color="white" />
+                    <Text style={styles.quickProgressText}>+5%</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.quickProgressButton,
+                      { backgroundColor: 'rgba(34, 197, 94, 0.3)' },
+                    ]}
+                    onPress={() => handleQuickProgress(10)}
+                  >
+                    <Ionicons name="add" size={16} color="white" />
+                    <Text style={styles.quickProgressText}>+10%</Text>
+                  </Pressable>
+                </View>
+                {showProgressInput && (
+                  <View style={styles.progressInputContainer}>
+                    <TextInput
+                      style={[
+                        styles.progressInput,
+                        {
+                          color: 'white',
+                          borderColor: 'rgba(255,255,255,0.3)',
+                        },
+                      ]}
+                      value={localProgress.toString()}
+                      onChangeText={(text) => {
+                        const num = parseInt(text) || 0;
+                        const clamped = Math.max(0, Math.min(100, num));
+                        setLocalProgress(clamped);
+                      }}
+                      keyboardType="number-pad"
+                      maxLength={3}
+                      placeholder="0-100"
+                      placeholderTextColor="rgba(255,255,255,0.5)"
+                    />
                     <Pressable
-                      style={{ flex: 1 }}
+                      style={[
+                        styles.progressSaveButton,
+                        { backgroundColor: '#22c55e' },
+                      ]}
                       onPress={() => {
-                        haptics.button();
-                        if (m.status === 'upcoming') {
-                          startMilestone(plan.id, m.id);
-                        } else if (m.status === 'in-progress') {
-                          completeMilestone(plan.id, m.id);
-                        }
+                        handleProgressUpdate(localProgress);
+                        setShowProgressInput(false);
                       }}
                     >
-                      <Text
-                        style={[
-                          styles.milestoneTitle,
-                          m.status === 'completed' &&
-                            styles.milestoneTitleCompleted,
-                        ]}
-                      >
-                        {m.title}
-                      </Text>
+                      <Text style={styles.progressSaveText}>Save</Text>
                     </Pressable>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        m.status === 'completed'
-                          ? styles.statusCompleted
-                          : m.status === 'in-progress'
-                          ? styles.statusInProgress
-                          : styles.statusUpcoming,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.statusText,
-                          m.status === 'completed'
-                            ? styles.statusTextCompleted
-                            : m.status === 'in-progress'
-                            ? styles.statusTextInProgress
-                            : styles.statusTextUpcoming,
-                        ]}
-                      >
-                        {m.status === 'completed'
-                          ? 'Completed'
-                          : m.status === 'in-progress'
-                          ? 'In Progress'
-                          : 'Upcoming'}
-                      </Text>
-                    </View>
                   </View>
-                </View>
-              ))}
+                )}
+              </View>
             </View>
-          ) : (
-            <Text style={styles.noMilestones}>
-              No milestones yet. They will be auto-generated as you progress.
-            </Text>
-          )}
+          </SafeAreaView>
         </View>
 
-        <View style={{ height: 100 }} />
-      </ScrollView>
-    </View>
-  );
-}
+        <ScrollView contentContainerStyle={styles.detailScrollContent}>
+          {/* Motivation Card */}
+          <LinearGradient
+            colors={['#f97316', '#ec4899']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.motivationCard}
+          >
+            <Ionicons
+              name="heart"
+              size={20}
+              color="white"
+              style={{ marginRight: 12 }}
+            />
+            <Text style={styles.motivationText}>
+              &quot;
+              {plan.motivationQuote ||
+                'Every journey begins with a single step.'}
+              &quot;
+            </Text>
+          </LinearGradient>
+
+          {/* Week Timeline */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons
+                name="calendar-outline"
+                size={20}
+                color="#16a34a"
+                style={{ marginRight: 8 }}
+              />
+              <Text style={styles.cardTitle}>This Week</Text>
+            </View>
+            <View style={styles.weekTimelineLarge}>
+              {WEEK_DAYS.map((day, index) => {
+                const isComplete = index < 3; // Simulation
+                const isToday = index === new Date().getDay() - 1;
+                return (
+                  <View key={day} style={styles.dayColumnLarge}>
+                    <Text
+                      style={[
+                        styles.dayLabelLarge,
+                        isToday && styles.dayLabelToday,
+                      ]}
+                    >
+                      {day}
+                    </Text>
+                    <View
+                      style={[
+                        styles.dayDotLarge,
+                        isComplete
+                          ? styles.dayCompletedLarge
+                          : isToday
+                          ? styles.dayTodayLarge
+                          : styles.dayFutureLarge,
+                      ]}
+                    >
+                      {isComplete && (
+                        <Ionicons name="checkmark" size={16} color="white" />
+                      )}
+                      {isToday && !isComplete && (
+                        <View style={styles.todayInner} />
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Next Task */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons
+                name="time-outline"
+                size={20}
+                color="#16a34a"
+                style={{ marginRight: 8 }}
+              />
+              <Text style={styles.cardTitle}>What&apos;s Next</Text>
+            </View>
+            <Text style={styles.cardBodyText}>{plan.nextTask}</Text>
+            <View style={styles.dateBadge}>
+              <Ionicons
+                name="calendar-outline"
+                size={14}
+                color="#374151"
+                style={{ marginRight: 4 }}
+              />
+              <Text style={styles.dateBadgeText}>{plan.dueDate}</Text>
+            </View>
+          </View>
+
+          {/* Research AI - Success Stories */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons
+                name="bulb"
+                size={20}
+                color="#f59e0b"
+                style={{ marginRight: 8 }}
+              />
+              <Text style={styles.cardTitle}>People Like You Succeeded</Text>
+            </View>
+            <View style={styles.successStoryCard}>
+              <Text style={styles.successAvatar}>{successStory.avatar}</Text>
+              <View style={styles.successContent}>
+                <Text style={styles.successTitle}>{successStory.title}</Text>
+                <Text style={styles.successContext}>
+                  {successStory.context}
+                </Text>
+                <Text style={styles.successSource}>
+                  From {successStory.source}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Milestones */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Milestones</Text>
+            </View>
+            {plan.milestones && plan.milestones.length > 0 ? (
+              <View style={styles.milestonesList}>
+                {plan.milestones.map((m, i) => (
+                  <View key={m.id} style={styles.milestoneItem}>
+                    <View style={styles.milestoneIcon}>
+                      {m.status === 'completed' ? (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={24}
+                          color="#22c55e"
+                        />
+                      ) : m.status === 'in-progress' ? (
+                        <Ionicons name="time" size={24} color="#3b82f6" />
+                      ) : (
+                        <Ionicons
+                          name="ellipse-outline"
+                          size={24}
+                          color="#d1d5db"
+                        />
+                      )}
+                    </View>
+                    <View style={styles.milestoneContent}>
+                      <Pressable
+                        style={{ flex: 1 }}
+                        onPress={() => {
+                          hapticButton();
+                          if (m.status === 'upcoming') {
+                            startMilestone(plan.id, m.id);
+                          } else if (m.status === 'in-progress') {
+                            completeMilestone(plan.id, m.id);
+                          }
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.milestoneTitle,
+                            m.status === 'completed' &&
+                              styles.milestoneTitleCompleted,
+                          ]}
+                        >
+                          {m.title}
+                        </Text>
+                      </Pressable>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          m.status === 'completed'
+                            ? styles.statusCompleted
+                            : m.status === 'in-progress'
+                            ? styles.statusInProgress
+                            : styles.statusUpcoming,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusText,
+                            m.status === 'completed'
+                              ? styles.statusTextCompleted
+                              : m.status === 'in-progress'
+                              ? styles.statusTextInProgress
+                              : styles.statusTextUpcoming,
+                          ]}
+                        >
+                          {m.status === 'completed'
+                            ? 'Completed'
+                            : m.status === 'in-progress'
+                            ? 'In Progress'
+                            : 'Upcoming'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.noMilestones}>
+                No milestones yet. They will be auto-generated as you progress.
+              </Text>
+            )}
+          </View>
+
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      </View>
+    );
+  }
+);
 
 const styles = StyleSheet.create({
   container: {

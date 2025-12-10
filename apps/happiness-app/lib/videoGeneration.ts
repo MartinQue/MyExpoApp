@@ -2,7 +2,6 @@
 // AI Video Generation Service
 // Supports multiple providers: Runway, Luma AI, OpenAI Sora (when available)
 
-import { OPENAI_API_KEY } from '../constants/Config';
 
 // ========================================
 // Types
@@ -105,12 +104,7 @@ export async function generateVideoFromText(
   prompt: string,
   options: VideoGenerationOptions = {}
 ): Promise<GeneratedVideo> {
-  const {
-    provider = 'runway',
-    duration = 5,
-    aspectRatio = '16:9',
-    quality = 'standard',
-  } = options;
+  const { provider = 'runway', duration = 5 } = options;
 
   const providerInfo = VIDEO_PROVIDERS.find((p) => p.id === provider);
 

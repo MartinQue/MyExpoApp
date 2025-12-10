@@ -5,10 +5,8 @@
  * Provides video reasoning, captioning, and insights from video content
  */
 
-import { OPENAI_API_KEY } from '@/constants/Config';
+import { Config, OPENAI_API_KEY } from '@/constants/Config';
 import { Logger } from '@/utils/Logger';
-
-import { Config } from '@/constants/Config';
 
 // Feature flag - enable/disable Thinking-with-Video integration
 const THINKING_VIDEO_ENABLED = !!Config.thinkingVideoApiUrl && !!Config.thinkingVideoApiKey;

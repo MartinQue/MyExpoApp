@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,19 +6,16 @@ import {
   Image,
   Pressable,
   Linking,
-  Dimensions,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { MotiView, AnimatePresence } from 'moti';
-import { Video, ResizeMode } from 'expo-av';
 import { Colors } from '@/constants/Theme';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { FeedCard as FeedCardType } from '@/lib/homeFeed';
 
-const { width } = Dimensions.get('window');
 const CARD_IMAGE_HEIGHT = 200;
 
 interface FeedCardProps {
@@ -45,7 +42,6 @@ export function FeedCard({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [liked, setLiked] = useState(initialLiked);
   const [bookmarked, setBookmarked] = useState(initialBookmarked);
-  const videoRef = useRef<Video>(null);
 
   const handleLike = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

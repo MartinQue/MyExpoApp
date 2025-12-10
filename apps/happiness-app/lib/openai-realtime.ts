@@ -14,13 +14,12 @@ import * as FileSystem from 'expo-file-system';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 import { Buffer } from 'buffer';
-
-if (typeof global.Buffer === 'undefined') {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (global as any).Buffer = Buffer;
-}
 import { OPENAI_API_KEY } from '@/constants/Config';
 import { supabase } from './supabase';
+
+if (typeof global.Buffer === 'undefined') {
+  (global as any).Buffer = Buffer;
+}
 
 // Event types from OpenAI Realtime API
 export type RealtimeEvent =
@@ -621,7 +620,7 @@ export async function saveConversation(
   }
   try {
     // Save conversation as a note in Supabase
-    const { data, error } = await supabase.from('notes').insert({
+    const { error } = await supabase.from('notes').insert({
       user_id: userId,
       kind: 'text',
       content: JSON.stringify(messages),
@@ -804,7 +803,7 @@ export async function saveGeneratedImage(
     const path = `images/${userId}/${filename}`;
 
     // Upload to Supabase storage
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from('media')
       .upload(path, blob, {
         contentType: 'image/png',

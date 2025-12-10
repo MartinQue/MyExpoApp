@@ -12,7 +12,6 @@ import {
   Alert,
   Image,
   ActivityIndicator,
-  Dimensions,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -33,9 +32,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
-import haptics from '@/lib/haptics';
+import {
+  send as hapticSend,
+  success as hapticSuccess,
+  selection as hapticSelection,
+} from '@/lib/haptics';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TAB_BAR_HEIGHT = 49;
 const BAR_HEIGHT_IDLE = 110;
 const BAR_HEIGHT_RECORDING = 56;
@@ -209,7 +211,7 @@ export function ChatInputBar({
     setText('');
     setAttachment(null);
     dismissKeyboard();
-    haptics.send();
+    hapticSend();
   };
 
   const handleCamera = async () => {
@@ -230,7 +232,7 @@ export function ChatInputBar({
         uri: result.assets[0].uri,
         mimeType: result.assets[0].mimeType || 'image/jpeg',
       });
-      haptics.success();
+      hapticSuccess();
     }
   };
 
@@ -252,7 +254,7 @@ export function ChatInputBar({
         uri: result.assets[0].uri,
         mimeType: result.assets[0].mimeType || 'image/jpeg',
       });
-      haptics.success();
+      hapticSuccess();
     }
   };
 
@@ -270,7 +272,7 @@ export function ChatInputBar({
           name: result.assets[0].name,
           mimeType: result.assets[0].mimeType || 'application/octet-stream',
         });
-        haptics.success();
+        hapticSuccess();
       }
     } catch (error) {
       console.error('Document picker error:', error);
@@ -279,24 +281,24 @@ export function ChatInputBar({
 
   const handleCreateImage = () => {
     setShowAttachments(false);
-    haptics.selection();
+    hapticSelection();
     router.push('/(tabs)/imagine' as any);
   };
 
   const removeAttachment = () => {
     setAttachment(null);
-    haptics.selection();
+    hapticSelection();
   };
 
   const handleMicPress = useCallback(() => {
     if (isTranscribing) return;
     dismissKeyboard();
-    haptics.selection();
+    hapticSelection();
     onVoiceToggle?.(!isListening);
   }, [isListening, isTranscribing, onVoiceToggle, dismissKeyboard]);
 
   const toggleAttachments = () => {
-    haptics.selection();
+    hapticSelection();
     setShowAttachments(!showAttachments);
   };
 

@@ -6,9 +6,7 @@ import {
   Dimensions,
   Pressable,
   RefreshControl,
-  ActivityIndicator,
   Platform,
-  Alert,
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,7 +27,7 @@ import Animated, {
 import { useTheme } from '@/contexts/ThemeContext';
 import { useUserStore } from '@/stores/userStore';
 import { usePlannerStore } from '@/stores/plannerStore';
-import * as haptics from '@/lib/haptics';
+import { medium as hapticMedium, light as hapticLight } from '@/lib/haptics';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { NextTaskCard } from '@/components/home/NextTaskCard';
 import { FeedCard } from '@/components/home/FeedCard';
@@ -38,7 +36,6 @@ import {
   buildHomeFeed,
   getTimeContext,
   getDailyStats,
-  refreshContextCards,
   generateInstantFeed,
   FeedCard as FeedCardType,
   DailyStats,
@@ -46,8 +43,6 @@ import {
 import {
   getLocationContext,
   getLocationPermission,
-  formatLocation,
-  getLocationGreeting,
   LocationContext,
 } from '@/lib/locationService';
 
@@ -215,8 +210,6 @@ export default function ProfileTab() {
   const [showCardModal, setShowCardModal] = useState(false);
   const router = useRouter();
   const scrollY = useSharedValue(0);
-  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const realTimeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastRefreshRef = useRef<number>(0);
   const isInitialLoadDone = useRef<boolean>(false);
 
@@ -233,12 +226,7 @@ export default function ProfileTab() {
           const context = await getLocationContext();
           setLocationContext(context);
 
-          // Update contextual message with location
           if (context.location && context.weather) {
-            const locationGreeting = getLocationGreeting(
-              context.location,
-              context.weather
-            );
             setContextMessage(
               context.suggestions[0] ||
                 `${context.weather.description} • ${context.weather.temperature}°C`
@@ -260,7 +248,7 @@ export default function ProfileTab() {
 
   // Auto-refresh feed periodically for real-time updates
   useEffect(() => {
-    refreshTimerRef.current = setInterval(async () => {
+    const timer = setInterval(async () => {
       const now = Date.now();
       if (now - lastRefreshRef.current >= FEED_REFRESH_INTERVAL) {
         console.log('🔄 Auto-refreshing feed...');
@@ -269,14 +257,9 @@ export default function ProfileTab() {
     }, REAL_TIME_UPDATE_INTERVAL);
 
     return () => {
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current);
-      }
-      if (realTimeTimerRef.current) {
-        clearInterval(realTimeTimerRef.current);
-      }
+      clearInterval(timer);
     };
-  }, []);
+  }, [loadFeed]);
 
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y;
@@ -339,6 +322,9 @@ export default function ProfileTab() {
   const loadFeed = useCallback(
     async (silent = false) => {
       try {
+        if (!silent) {
+          setLoading(true);
+        }
         if (!silent && !isInitialLoadDone.current) {
           console.log('📱 Loading personalized home feed...');
         }
@@ -397,39 +383,45 @@ export default function ProfileTab() {
   );
 
   // Handle card tap - open full-screen modal for expandable cards, navigate for others
-  const handleCardTap = useCallback((card: FeedCardType) => {
-    if (card.isExpandable) {
-      haptics.medium();
-      setSelectedCard(card);
-      setShowCardModal(true);
-    } else if (card.navigationRoute && card.sourceType === 'internal') {
-      haptics.light();
-      router.push(card.navigationRoute as any);
-    } else if (card.externalUrl && card.sourceType === 'external') {
-      haptics.light();
-      Linking.openURL(card.externalUrl).catch((err) =>
-        console.error('Failed to open URL:', err)
-      );
-    }
-  }, [router]);
-
-  // Handle navigation from expanded card modal
-  const handleCardNavigate = useCallback((card: FeedCardType) => {
-    setShowCardModal(false);
-    setSelectedCard(null);
-    
-    setTimeout(() => {
-      if (card.navigationRoute && card.sourceType === 'internal') {
-        haptics.light();
+  const handleCardTap = useCallback(
+    (card: FeedCardType) => {
+      if (card.isExpandable) {
+        hapticMedium();
+        setSelectedCard(card);
+        setShowCardModal(true);
+      } else if (card.navigationRoute && card.sourceType === 'internal') {
+        hapticLight();
         router.push(card.navigationRoute as any);
       } else if (card.externalUrl && card.sourceType === 'external') {
-        haptics.light();
+        hapticLight();
         Linking.openURL(card.externalUrl).catch((err) =>
           console.error('Failed to open URL:', err)
         );
       }
-    }, 300);
-  }, [router]);
+    },
+    [router]
+  );
+
+  // Handle navigation from expanded card modal
+  const handleCardNavigate = useCallback(
+    (card: FeedCardType) => {
+      setShowCardModal(false);
+      setSelectedCard(null);
+
+      setTimeout(() => {
+        if (card.navigationRoute && card.sourceType === 'internal') {
+          hapticLight();
+          router.push(card.navigationRoute as any);
+        } else if (card.externalUrl && card.sourceType === 'external') {
+          hapticLight();
+          Linking.openURL(card.externalUrl).catch((err) =>
+            console.error('Failed to open URL:', err)
+          );
+        }
+      }, 300);
+    },
+    [router]
+  );
 
   // Handle like from modal
   const handleModalLike = useCallback(
@@ -453,20 +445,19 @@ export default function ProfileTab() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    haptics.light();
+    hapticLight();
 
-    // Refresh contextual message too
     setContextMessage(getContextualMessage(timeOfDay));
 
     await loadFeed();
 
     setRefreshing(false);
-    haptics.success();
+    hapticSuccess();
   }, [loadFeed, timeOfDay]);
 
   // Navigate to a quick action
   const handleQuickAction = (route: string) => {
-    haptics.button();
+    hapticButton();
     router.push(route as any);
   };
 
@@ -555,7 +546,7 @@ export default function ProfileTab() {
               },
             ]}
             onPress={() => {
-              haptics.button();
+              hapticButton();
               router.push('/settings');
             }}
           >
@@ -676,7 +667,7 @@ export default function ProfileTab() {
               },
             ]}
             onPress={() => {
-              haptics.button();
+              hapticButton();
               router.push('/(tabs)/planner' as any);
             }}
           >

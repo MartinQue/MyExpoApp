@@ -1,0 +1,134 @@
+{
+  "airi": {
+    "tops": [
+      {
+        "id": "airi_top_default",
+        "name": "Signature Blazer",
+        "preview": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab",
+        "rarity": "legendary",
+        "description": "Airi's iconic blazer with soft neon reflections."
+      },
+      {
+        "id": "airi_top_casual",
+        "name": "Casual Knit",
+        "preview": "https://images.unsplash.com/photo-1525171254930-643fc658b64e",
+        "rarity": "rare",
+        "description": "Relaxed knit sweater for low-key chill vibes."
+      }
+    ],
+    "bottoms": [
+      {
+        "id": "airi_bottom_default",
+        "name": "Pleated Skirt",
+        "preview": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab",
+        "rarity": "legendary"
+      },
+      {
+        "id": "airi_bottom_denim",
+        "name": "Denim Shorts",
+        "preview": "https://images.unsplash.com/photo-1512436991641-6745cdb1723f",
+        "rarity": "uncommon"
+      }
+    ],
+    "accessories": [
+      {
+        "id": "airi_acc_headphones",
+        "name": "Holographic Headphones",
+        "preview": "https://images.unsplash.com/photo-1489515217757-5fd1be406fef",
+        "rarity": "epic"
+      },
+      {
+        "id": "airi_acc_glasses",
+        "name": "Studio Glasses",
+        "preview": "https://images.unsplash.com/photo-1516646255117-8a1f66ed1a91",
+        "rarity": "rare"
+      }
+    ]
+  },
+  "calm": {
+    "tops": [
+      {
+        "id": "calm_top_default",
+        "name": "Meditation Robe",
+        "preview": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1",
+        "rarity": "legendary"
+      },
+      {
+        "id": "calm_top_wrap",
+        "name": "Serenity Wrap",
+        "preview": "https://images.unsplash.com/photo-1542291026-7eec264c27ff",
+        "rarity": "rare"
+      }
+    ],
+    "bottoms": [
+      {
+        "id": "calm_bottom_default",
+        "name": "Flow Pants",
+        "preview": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1",
+        "rarity": "legendary"
+      }
+    ],
+    "accessories": [
+      {
+        "id": "calm_acc_beads",
+        "name": "Mindful Beads",
+        "preview": "https://images.unsplash.com/photo-1503341455253-b2e723bb3dbb",
+        "rarity": "rare"
+      }
+    ]
+  },
+  "heart": {
+    "tops": [
+      {
+        "id": "heart_top_default",
+        "name": "Rose Silk",
+        "preview": "https://images.unsplash.com/photo-1490481651871-ab68de25d43d",
+        "rarity": "legendary"
+      }
+    ],
+    "accessories": [
+      {
+        "id": "heart_acc_choker",
+        "name": "Heart Choker",
+        "preview": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1",
+        "rarity": "epic"
+      }
+    ]
+  },
+  "mind": {
+    "tops": [
+      {
+        "id": "mind_top_default",
+        "name": "Scholar Jacket",
+        "preview": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab",
+        "rarity": "legendary"
+      }
+    ],
+    "accessories": [
+      {
+        "id": "mind_acc_monocle",
+        "name": "Focus Monocle",
+        "preview": "https://images.unsplash.com/photo-1534413197763-b3c8441f9854",
+        "rarity": "epic"
+      }
+    ]
+  },
+  "rise": {
+    "tops": [
+      {
+        "id": "rise_top_default",
+        "name": "Ignition Jacket",
+        "preview": "https://images.unsplash.com/photo-1512436991641-6745cdb1723f",
+        "rarity": "legendary"
+      }
+    ],
+    "accessories": [
+      {
+        "id": "rise_acc_band",
+        "name": "Momentum Armband",
+        "preview": "https://images.unsplash.com/photo-1503341455253-b2e723bb3dbb",
+        "rarity": "rare"
+      }
+    ]
+  }
+}

@@ -17,6 +17,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   assetBundlePatterns: ['**/*'],
   ios: {
     supportsTablet: true,
+    infoPlist: {
+      NSMicrophoneUsageDescription:
+        'This app uses the microphone to record audio.',
+    },
   },
   android: {
     adaptiveIcon: {
@@ -32,6 +36,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     'expo-router',
     'expo-asset',
+    '@livekit/react-native-expo-plugin',
+    '@config-plugins/react-native-webrtc',
   ],
   experiments: {
     typedRoutes: true,

@@ -1,3 +1,3 @@
-export * from './ChatComposer';
+export { ChatComposer } from './ChatComposer';
 export * from './ChatContainer';
 export * from './MessageBubble';

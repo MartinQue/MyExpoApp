@@ -8,6 +8,14 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { VoiceProvider } from '@/contexts/VoiceContext';
 import { LogViewer } from '@/components/DevTools/LogViewer';
 
+// Register LiveKit globals for WebRTC support (only if available)
+try {
+  const { registerGlobals } = require('@livekit/react-native');
+  registerGlobals();
+} catch (error) {
+  // LiveKit not available (e.g., in Expo Go) - will use expo-speech fallback
+}
+
 function AppContent() {
   const { colors, isDark } = useTheme();
 

@@ -5,18 +5,20 @@ import PagerView from 'react-native-pager-view';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 
 import { AskScreen } from './AskScreen';
-import AlterEgoScreen from './AlterEgoScreen';
+import CompanionsScreen from './AlterEgoScreen';
 import { useChatStore } from '@/stores/chatStore';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useVoiceContext } from '@/contexts/VoiceContext';
 import { useUserStore } from '@/stores/userStore';
-import haptics from '@/lib/haptics';
+import {
+  selection as hapticSelection,
+  success as hapticSuccess,
+} from '@/lib/haptics';
 
 export function ChatTab() {
-  const { colors, isDark, getGradientArray } = useTheme();
+  const { colors, getGradientArray } = useTheme();
   const { isListening, cancelRecording, startRecording } = useVoiceContext();
   const [activeTab, setActiveTab] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -27,7 +29,7 @@ export function ChatTab() {
 
   const handleTabPress = (index: number) => {
     if (activeTab !== index) {
-      haptics.selection();
+      hapticSelection();
       // Cancel recording if active when switching tabs
       if (isListening) {
         cancelRecording();
@@ -39,7 +41,7 @@ export function ChatTab() {
 
   const onPageSelected = async (e: any) => {
     const newTab = e.nativeEvent.position;
-    haptics.selection();
+    hapticSelection();
 
     // Cancel recording if active when swiping between tabs
     if (isListening && newTab !== activeTab) {
@@ -48,16 +50,9 @@ export function ChatTab() {
 
     setActiveTab(newTab);
 
-    // Auto-start listening when entering Alter Ego (Grok-like behaviour)
-    if (newTab === 1 && voiceEnabled) {
-      const started = await startRecording();
-      if (!started) {
-        Alert.alert(
-          'Microphone unavailable',
-          'Enable microphone access to chat hands-free with Alter Ego.'
-        );
-      }
-    }
+    // REMOVED: Auto-start listening
+    // Recording should ONLY start when user explicitly presses the mic button
+    // after avatar is loaded and user navigates to Chat/Ask page
   };
 
   const handleNewChat = useCallback(() => {
@@ -78,7 +73,7 @@ export function ChatTab() {
             clearHistory();
             // Force re-render of chat screens
             setRefreshKey((prev) => prev + 1);
-            haptics.success();
+            hapticSuccess();
           },
         },
       ]
@@ -86,7 +81,7 @@ export function ChatTab() {
   }, [clearHistory]);
 
   const handleMenuPress = useCallback(() => {
-    haptics.selection();
+    hapticSelection();
     router.push('/settings');
   }, [router]);
 
@@ -146,7 +141,7 @@ export function ChatTab() {
                   { color: activeTab === 1 ? colors.text : colors.textMuted },
                 ]}
               >
-                Alter Ego
+                Companions
               </Text>
               {activeTab === 1 && (
                 <View
@@ -188,7 +183,7 @@ export function ChatTab() {
           <AskScreen />
         </View>
         <View key="2">
-          <AlterEgoScreen />
+          <CompanionsScreen />
         </View>
       </PagerView>
     </View>

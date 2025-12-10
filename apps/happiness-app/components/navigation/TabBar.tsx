@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import haptics from '@/lib/haptics';
+import { tabSwitch as hapticTabSwitch } from '@/lib/haptics';
 
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { colors, isDark } = useTheme();
@@ -53,7 +53,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             });
 
             if (!isFocused && !event.defaultPrevented) {
-              haptics.tabSwitch();
+              hapticTabSwitch();
               navigation.navigate(route.name, route.params);
             }
           };

@@ -10,6 +10,13 @@
 
 This document provides a complete, actionable implementation plan to transform the Happiness AI app into a production-ready, Grok-level experience. Based on comprehensive codebase analysis and the provided Grok reference images, this plan addresses all identified issues systematically.
 
+## Context Engineering Snapshot (2025-12-06)
+- **Visual first principle**: Assume every surface displays a Project Airi-quality anime avatar. Use Open-LLM-VTuber assets only as a fallback if Airi pipelines fail. Document any downgrade paths in hand-off notes.
+- **Voice directive**: Route spoken responses through IndexTTS by default. ElevenLabs or `expo-speech` are emergency fallbacks and must log provider usage so testers can verify audio provenance.
+- **Navigation vocabulary**: Top tabs are strictly `Ask / Alter Ego`. In all prompts and UI copy, refer to selectable characters as "Avatars"; reserve "Alter Ego" for the future adaptive persona feature.
+- **UX guardrails**: Reinforce that the chat bar must float above the navbar with a 12–16 px gap and animate alongside the keyboard. Stress that glassmorphism tokens should stay consistent across chat, navbar, and floating controls in both light and dark themes.
+- **Frustration refresh**: Remind agents about historical pitfalls—chat bar hiding behind keyboard, theme mismatches, robotic audio—and instruct them to validate on-device before marking tasks complete.
+
 ---
 
 ## 🎯 Key Issues Identified & Solutions

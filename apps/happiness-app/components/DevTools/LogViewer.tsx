@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { useLogStore, LogEntry } from '@/utils/Logger';
+import { useLogStore } from '@/utils/Logger';
 import { Colors } from '@/constants/Theme';
 
 export function LogViewer() {

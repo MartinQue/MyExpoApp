@@ -1,17 +1,17 @@
 // components/home/CardDetailModal.tsx
 // Full-screen modal for expanded card details - Grok-style design
 
-import React, { useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   Pressable,
   ScrollView,
   Image,
   Linking,
   Share,
+  Dimensions,
   Platform,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
@@ -25,15 +25,13 @@ import Animated, {
   runOnJS,
   FadeIn,
   SlideInUp,
-  SlideOutDown,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { Video, ResizeMode } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { FeedCard as FeedCardType } from '@/lib/homeFeed';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
 interface CardDetailModalProps {
   visible: boolean;
@@ -58,13 +56,12 @@ export function CardDetailModal({
 }: CardDetailModalProps) {
   const { colors, isDark } = useTheme();
   const translateY = useSharedValue(0);
-  const videoRef = useRef<Video>(null);
 
   useEffect(() => {
     if (!visible) {
       translateY.value = 0;
     }
-  }, [visible]);
+  }, [translateY, visible]);
 
   const handleClose = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -90,41 +87,41 @@ export function CardDetailModal({
     transform: [{ translateY: translateY.value }],
   }));
 
-  const handleShare = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const handleShare = useCallback(() => {
     if (!card) return;
 
-    try {
-      await Share.share({
-        title: card.title || 'Check this out',
-        message: card.content,
-      });
-    } catch (error) {
-      console.error('Error sharing:', error);
-    }
-  };
-
-  const handleOpenLink = (url: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Linking.openURL(url).catch((err) =>
-      console.error('Failed to open URL:', err)
-    );
-  };
 
-  const handleLike = () => {
+    Share.share({
+      title: card.title || 'Check this out',
+      message: card.content,
+    }).catch((error) => {
+      console.error('Error sharing:', error);
+    });
+  }, [card]);
+
+  const handleOpenLink = useCallback((url: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Linking.openURL(url).catch((error) =>
+      console.error('Failed to open URL:', error)
+    );
+  }, []);
+
+  const handleLike = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onLike?.(!isLiked);
-  };
+  }, [isLiked, onLike]);
 
-  const handleBookmark = () => {
+  const handleBookmark = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onBookmark?.(!isBookmarked);
-  };
+  }, [isBookmarked, onBookmark]);
 
-  if (!visible || !card) return null;
+  const cardGradient = useMemo<[string, string]>(() => {
+    if (!card) {
+      return ['rgba(100, 80, 255, 0.1)', 'rgba(0, 0, 0, 0.95)'];
+    }
 
-  // Get gradient colors based on card type
-  const getCardGradient = (): string[] => {
     switch (card.type) {
       case 'finance':
         return ['rgba(16, 185, 129, 0.1)', 'rgba(0, 0, 0, 0.95)'];
@@ -139,9 +136,13 @@ export function CardDetailModal({
       default:
         return ['rgba(100, 80, 255, 0.1)', 'rgba(0, 0, 0, 0.95)'];
     }
-  };
+  }, [card]);
 
-  const getTypeIcon = (): string => {
+  const typeIcon = useMemo(() => {
+    if (!card) {
+      return 'sparkles';
+    }
+
     switch (card.type) {
       case 'finance':
         return 'trending-up';
@@ -160,9 +161,13 @@ export function CardDetailModal({
       default:
         return 'sparkles';
     }
-  };
+  }, [card]);
 
-  const getAccentColor = (): string => {
+  const accentColor = useMemo(() => {
+    if (!card) {
+      return colors.primary;
+    }
+
     switch (card.type) {
       case 'finance':
         return '#10B981';
@@ -177,7 +182,9 @@ export function CardDetailModal({
       default:
         return colors.primary;
     }
-  };
+  }, [card, colors.primary]);
+
+  if (!visible || !card) return null;
 
   return (
     <Animated.View style={[styles.overlay]} entering={FadeIn.duration(200)}>
@@ -188,10 +195,7 @@ export function CardDetailModal({
           style={[styles.modalContainer, animatedContainerStyle]}
           entering={SlideInUp.springify().damping(15)}
         >
-          <LinearGradient
-            colors={getCardGradient() as [string, string, ...string[]]}
-            style={styles.gradient}
-          >
+          <LinearGradient colors={cardGradient} style={styles.gradient}>
             {/* Handle bar */}
             <View style={styles.handleBar}>
               <View
@@ -204,15 +208,15 @@ export function CardDetailModal({
               <View
                 style={[
                   styles.typeTag,
-                  { backgroundColor: `${getAccentColor()}20` },
+                  { backgroundColor: `${accentColor}20` },
                 ]}
               >
                 <Ionicons
-                  name={getTypeIcon() as any}
+                  name={typeIcon as any}
                   size={14}
-                  color={getAccentColor()}
+                  color={accentColor}
                 />
-                <Text style={[styles.typeText, { color: getAccentColor() }]}>
+                <Text style={[styles.typeText, { color: accentColor }]}>
                   {card.agent?.toUpperCase() || card.type.toUpperCase()}
                 </Text>
               </View>
@@ -743,7 +747,7 @@ export function CardDetailModal({
                 </Text>
               </Pressable>
 
-              {(card.navigationRoute || card.externalUrl) ? (
+              {card.navigationRoute || card.externalUrl ? (
                 <Pressable
                   style={[
                     styles.primaryButton,
@@ -758,10 +762,14 @@ export function CardDetailModal({
                     }
                   }}
                 >
-                  <Ionicons 
-                    name={card.sourceType === 'external' ? 'open-outline' : 'arrow-forward'} 
-                    size={16} 
-                    color="white" 
+                  <Ionicons
+                    name={
+                      card.sourceType === 'external'
+                        ? 'open-outline'
+                        : 'arrow-forward'
+                    }
+                    size={16}
+                    color="white"
                     style={{ marginRight: 4 }}
                   />
                   <Text style={styles.primaryButtonText}>

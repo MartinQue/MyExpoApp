@@ -54,7 +54,38 @@ const { isRecording, transcript, startRecording, stopRecording } = useVoice();
 
 ---
 
-### 3. OpenAI DALL-E 3 (Image Generation)
+### 3. IndexTTS (Primary Voice Synthesis)
+
+**Status:** 🔜 Integration Required
+**Priority:** Highest (mandated by stakeholder)
+**Reference:** https://github.com/index-tts/index-tts
+
+- Must become the default synthesis provider for all spoken responses.
+- Requires investigation into streaming vs. pre-generated audio for mobile environments.
+- Needs provider selection logic in `lib/voice/ttsService.ts` so that IndexTTS attempts playback first; on failure, fall back to ElevenLabs, then expo-speech.
+- Capture telemetry (provider used, duration, latency) for QA sign-off.
+
+**To Do:**
+
+1. Audit IndexTTS API/SDK options and confirm Expo compatibility (possible native module or server relay).
+2. Implement `IndexTTSClient` wrapper that exposes `synthesizeToFile` and `streamToBuffer` utilities.
+3. Update `useTTS` hook to prioritise IndexTTS and emit events for avatar lip-sync.
+4. Add configuration flags in `constants/Config.ts` for IndexTTS credentials/endpoints.
+
+---
+
+### 4. ElevenLabs (Voice Fallback)
+
+**Status:** ✅ Integrated but now secondary
+**Files:** [`lib/voice/ttsService.ts`](../lib/voice/ttsService.ts)
+
+- Keep implementation as tertiary fallback.
+- Update documentation to note quality issues and the requirement to log fallback usage.
+- Remove any copy that suggests ElevenLabs is the primary provider.
+
+---
+
+### 5. OpenAI DALL-E 3 (Image Generation)
 
 **Status:** ✅ Active
 **File:** [`lib/imageGeneration.ts`](../lib/imageGeneration.ts)
@@ -93,7 +124,7 @@ const image = await generateImage(enhanced, {
 
 ## 🔜 Coming Soon Integrations
 
-### 4. Video Generation (Runway / Luma AI)
+### 6. Video Generation (Runway / Luma AI)
 
 **Status:** 🔜 Scaffolding Ready
 **File:** [`lib/videoGeneration.ts`](../lib/videoGeneration.ts)
@@ -115,7 +146,7 @@ Prepared integration for video generation providers:
 
 ---
 
-### 5. Content Aggregation APIs
+### 7. Content Aggregation APIs
 
 **Status:** 🔜 Planned
 **PRD Reference:** Phase 11 - Enhanced Home Page

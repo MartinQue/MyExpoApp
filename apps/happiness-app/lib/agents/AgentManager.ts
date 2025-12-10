@@ -1,4 +1,3 @@
-import { AGENTS, LANGSMITH_API_KEY } from '../../constants/Config';
 
 export interface Message {
   id: string;
@@ -28,8 +27,6 @@ export class AgentManager {
 
   async sendToAlterEgo(userMessage: string, conversationHistory: Message[] = []): Promise<Message> {
     try {
-      const startTime = Date.now();
-      
       // Placeholder - LangSmith integration disabled for now
       // TODO: Re-enable when LangSmith endpoint is properly configured
       console.log('AgentManager: sendToAlterEgo called with:', userMessage);

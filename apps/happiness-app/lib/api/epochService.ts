@@ -5,10 +5,8 @@
  * Provides time-of-day awareness, event context, and intelligent conversation starters
  */
 
-import { OPENAI_API_KEY } from '@/constants/Config';
+import { Config, OPENAI_API_KEY } from '@/constants/Config';
 import { Logger } from '@/utils/Logger';
-
-import { Config } from '@/constants/Config';
 
 // Feature flag - enable/disable Epoch integration
 const EPOCH_ENABLED = !!Config.epochApiUrl && !!Config.epochApiKey;

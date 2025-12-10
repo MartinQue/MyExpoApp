@@ -15,7 +15,11 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as haptics from '@/lib/haptics';
+import {
+  button as hapticButton,
+  light as hapticLight,
+  medium as hapticMedium,
+} from '@/lib/haptics';
 import { Video, ResizeMode } from 'expo-av';
 import { MotiView } from 'moti';
 import { useLibraryStore, MediaItem } from '@/stores/libraryStore';
@@ -57,21 +61,20 @@ export default function LibraryTab() {
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showFiltersModal, setShowFiltersModal] = useState(false);
 
   const handleFilterChange = (newFilter: string | null) => {
-    haptics.button();
+    hapticButton();
     setSelectedFilter(newFilter);
   };
 
-  const openItem = (item: MediaItem) => {
-    haptics.light();
+  const openItem = useCallback((item: MediaItem) => {
+    hapticLight();
     setSelectedItem(item);
     setShowDetailModal(true);
-  };
+  }, []);
 
   const closeDetail = () => {
-    haptics.button();
+    hapticButton();
     setSelectedItem(null);
     setShowDetailModal(false);
   };
@@ -94,7 +97,7 @@ export default function LibraryTab() {
     }
 
     // Filter by type
-    if (selectedFilter) {
+    if (selectedFilter && selectedFilter !== 'all') {
       items = items.filter((item) => item.type === selectedFilter);
     }
 
@@ -112,54 +115,27 @@ export default function LibraryTab() {
 
   const filteredItems = getFilteredItems();
 
-  // Grid Item Component with video support (Instagram-style moving snippets)
-  const GridItem = React.memo(function GridItem({
-    item,
-    index,
-    onPress,
-  }: {
-    item: MediaItem;
-    index: number;
-    onPress: (item: MediaItem) => void;
-  }) {
-    const { colors } = useTheme();
-    const [isPlaying, setIsPlaying] = useState(false);
-    const videoRef = React.useRef<Video>(null);
-
-    // Auto-play video snippets on mount (Instagram-style)
-    React.useEffect(() => {
-      if (item.type === 'video' && item.url) {
-        // Small delay for staggered playback
-        const timer = setTimeout(() => {
-          setIsPlaying(true);
-        }, index * 100);
-        return () => clearTimeout(timer);
-      }
-    }, [item.type, item.url, index]);
-
-    return (
+  const renderGridItem = useCallback(
+    ({ item, index }: { item: MediaItem; index: number }) => (
       <MotiView
         from={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ type: 'timing', duration: 300, delay: index * 30 }}
+        style={{ width: ITEM_SIZE }}
       >
         <Pressable
-          style={[
-            styles.gridItemContainer,
-            { backgroundColor: colors.surface },
-          ]}
-          onPress={() => onPress(item)}
+          style={[styles.gridItemContainer, { backgroundColor: colors.surface }]}
+          onPress={() => openItem(item)}
         >
           {item.type === 'video' && item.url ? (
             <View style={styles.videoWrapper}>
               <Video
-                ref={videoRef}
                 source={{ uri: item.url }}
                 style={styles.gridVideo}
                 resizeMode={ResizeMode.COVER}
                 isLooping
                 isMuted
-                shouldPlay={isPlaying}
+                shouldPlay
                 useNativeControls={false}
               />
               <View style={styles.videoOverlay} />
@@ -182,14 +158,12 @@ export default function LibraryTab() {
             />
           )}
 
-          {/* Voice memo indicator */}
           {item.type === 'voice-memo' && (
             <View style={styles.audioIndicator}>
               <Ionicons name="mic" size={18} color="white" />
             </View>
           )}
 
-          {/* Multiple items indicator */}
           {item.tags && item.tags.length > 2 && (
             <View style={styles.multiIndicator}>
               <Ionicons name="copy" size={14} color="white" />
@@ -197,16 +171,11 @@ export default function LibraryTab() {
           )}
         </Pressable>
       </MotiView>
-    );
-  });
-
-  // Render Instagram-style grid item
-  const renderGridItem = useCallback(
-    ({ item, index }: { item: MediaItem; index: number }) => (
-      <GridItem item={item} index={index} onPress={openItem} />
     ),
-    [openItem]
+    [colors.surface, openItem]
   );
+
+
 
   // Render note card with sentiment
   const renderNoteCard = (note: MediaItem) => {
@@ -727,7 +696,7 @@ export default function LibraryTab() {
                   styles.actionButtonPrimary,
                   { backgroundColor: colors.primary },
                 ]}
-                onPress={() => haptics.medium()}
+                onPress={() => hapticMedium()}
               >
                 <Ionicons name="pencil" size={18} color="white" />
                 <Text style={styles.actionButtonText}>Edit</Text>
@@ -817,8 +786,8 @@ export default function LibraryTab() {
                     { backgroundColor: colors.glassBackground },
                   ]}
                   onPress={() => {
-                    haptics.button();
-                    setShowFiltersModal(true);
+                    hapticButton();
+                    setSelectedFilter(null);
                   }}
                 >
                   <Ionicons name="filter" size={20} color={colors.text} />
@@ -882,7 +851,8 @@ export default function LibraryTab() {
             ]}
             onPress={() => {
               setFilter('personal');
-              haptics.button();
+              setSelectedFilter('personal');
+              hapticButton();
             }}
           >
             <Ionicons
@@ -913,7 +883,8 @@ export default function LibraryTab() {
             ]}
             onPress={() => {
               setFilter('notes');
-              haptics.button();
+              setSelectedFilter('notes');
+              hapticButton();
             }}
           >
             <Ionicons
@@ -1110,7 +1081,7 @@ export default function LibraryTab() {
                   ]}
                   onPress={() => {
                     setSelectedGoal(null);
-                    haptics.button();
+                    hapticButton();
                   }}
                 >
                   <Text
@@ -1144,7 +1115,7 @@ export default function LibraryTab() {
                       setSelectedGoal(
                         selectedGoal === plan.title ? null : plan.title
                       );
-                      haptics.button();
+                      hapticButton();
                     }}
                   >
                     <Text

@@ -21,7 +21,12 @@ import {
   cancelVoiceInput,
   setVoiceCallbacks,
 } from '@/components/chat/ChatHelpers';
-import haptics from '@/lib/haptics';
+import {
+  voiceStart as hapticVoiceStart,
+  voiceStop as hapticVoiceStop,
+  success as hapticSuccess,
+  error as hapticError,
+} from '@/lib/haptics';
 
 // ============================================================
 // Types
@@ -93,15 +98,15 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
       setIsTranscribing(true);
 
       // Haptic feedback for stop
-      await haptics.voiceStop();
+      await hapticVoiceStop();
 
       const transcription = await stopVoiceInput();
       setIsTranscribing(false);
 
       if (transcription && transcription.trim()) {
         setLastTranscription(transcription);
-        await haptics.success();
-        console.log('🎤 VoiceContext: Transcription received:', transcription);
+        await hapticSuccess();
+        // Transcription received - handled by callbacks
       }
 
       return transcription;
@@ -126,15 +131,15 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
       isStoppingRef.current = false;
 
       // Haptic feedback for start
-      await haptics.voiceStart();
+      await hapticVoiceStart();
 
       const started = await startVoiceInput();
       if (started) {
         setIsListening(true);
-        console.log('🎤 VoiceContext: Recording started');
+        // Recording started - handled by callbacks
       } else {
         setError('Failed to start recording');
-        await haptics.error();
+        await hapticError();
       }
       return started;
     } catch (err) {
@@ -153,9 +158,9 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
       setDuration(0);
       silenceStartRef.current = null;
       await cancelVoiceInput();
-      console.log('🎤 VoiceContext: Recording cancelled');
+      // Recording cancelled - handled by callbacks
     } catch (err) {
-      console.error('Error cancelling recording:', err);
+      // Error cancelling recording - handled by callbacks
     }
   }, []);
 
@@ -184,7 +189,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
               silenceDuration > SILENCE_DURATION_MS &&
               durationRef.current > MIN_RECORDING_DURATION_SEC
             ) {
-              console.log('🤫 Silence detected, auto-stopping recording...');
+              // Silence detected, auto-stopping recording
               stopRecording();
             }
           }
@@ -194,11 +199,11 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
         }
       },
       onError: (err) => {
-        console.error('🎤 Voice error in context:', err.message);
+        // Voice error handled by callbacks
         setError(err.message);
         setIsListening(false);
         setIsTranscribing(false);
-        haptics.error();
+        hapticError();
       },
       onTranscriptionStart: () => {
         setIsTranscribing(true);
@@ -213,7 +218,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
       // Cleanup on unmount
       cancelVoiceInput();
     };
-  }, [stopRecording]); // Only depend on stopRecording which is stable
+  }, [stopRecording, SILENCE_THRESHOLD_DB]);
 
   const clearError = useCallback(() => {
     setError(null);

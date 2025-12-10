@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
-import haptics from '@/lib/haptics';
+import { selection as hapticSelection } from '@/lib/haptics';
 
 interface NextTaskCardProps {
   task: {
@@ -25,7 +25,7 @@ export function NextTaskCard({ task, onPress }: NextTaskCardProps) {
   return (
     <Pressable
       onPress={() => {
-        haptics.selection();
+        hapticSelection();
         onPress?.();
       }}
       style={[

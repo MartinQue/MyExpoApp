@@ -2,7 +2,7 @@
  * VoiceInputButton - Animated voice recording button with transcription
  */
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,7 +23,11 @@ import Animated, {
 import { Ionicons } from '@expo/vector-icons';
 import { useVoice } from '@/lib/voice';
 import { useTheme } from '@/contexts/ThemeContext';
-import haptics from '@/lib/haptics';
+import {
+  voiceStart as hapticVoiceStart,
+  voiceStop as hapticVoiceStop,
+  warning as hapticWarning,
+} from '@/lib/haptics';
 
 interface VoiceInputButtonProps {
   onTranscript: (text: string) => void;
@@ -98,7 +102,7 @@ export function VoiceInputButton({
     if (disabled || isTranscribing) return;
 
     scale.value = withSpring(0.9);
-    await haptics.voiceStart();
+    await hapticVoiceStart();
     await startRecording();
   }, [disabled, isTranscribing, scale, startRecording]);
 
@@ -106,7 +110,7 @@ export function VoiceInputButton({
     if (!isRecording) return;
 
     scale.value = withSpring(1);
-    await haptics.voiceStop();
+    await hapticVoiceStop();
     await stopRecording();
   }, [isRecording, scale, stopRecording]);
 
@@ -114,7 +118,7 @@ export function VoiceInputButton({
     if (!isRecording) return;
 
     scale.value = withSpring(1);
-    await haptics.warning();
+    await hapticWarning();
     await cancelRecording();
   }, [isRecording, scale, cancelRecording]);
 

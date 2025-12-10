@@ -19,7 +19,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import * as haptics from '@/lib/haptics';
+import {
+  warning as hapticWarning,
+  button as hapticButton,
+  success as hapticSuccess,
+  error as hapticError,
+  medium as hapticMedium,
+} from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
@@ -287,18 +293,18 @@ export default function ImagineTab() {
     const modeConfig = GENERATION_MODES.find((m) => m.id === mode);
 
     if (!modeConfig?.available && !user.isPro) {
-      haptics.warning();
+      hapticWarning();
       setShowPaywall(true);
       return;
     }
 
     if (modeConfig?.premium && !user.isPro) {
-      haptics.warning();
+      hapticWarning();
       setShowPaywall(true);
       return;
     }
 
-    haptics.button();
+    hapticButton();
     setGenerationMode(mode);
 
     if (mode === 'video') {
@@ -309,10 +315,10 @@ export default function ImagineTab() {
   const handleModelSelect = (modelId: string) => {
     const model = AI_MODELS.find((m) => m.id === modelId);
     if (!model?.available) {
-      haptics.warning();
+      hapticWarning();
       return;
     }
-    haptics.button();
+    hapticButton();
     setSelectedModel(modelId);
     setShowModelPicker(false);
   };
@@ -320,11 +326,11 @@ export default function ImagineTab() {
   const handleQualitySelect = (qualityId: string) => {
     const quality = QUALITY_PRESETS.find((q) => q.id === qualityId);
     if (quality?.premium && !user.isPro) {
-      haptics.warning();
+      hapticWarning();
       setShowPaywall(true);
       return;
     }
-    haptics.button();
+    hapticButton();
     setSelectedQuality(qualityId);
   };
 
@@ -345,7 +351,7 @@ export default function ImagineTab() {
       if (!result.canceled) {
         const uris = result.assets.map((a) => a.uri);
         setSelectedImages(uris);
-        haptics.success();
+        hapticSuccess();
       }
     } catch (error) {
       console.error('Image selection failed:', error);
@@ -354,7 +360,7 @@ export default function ImagineTab() {
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      haptics.warning();
+      hapticWarning();
       return;
     }
 
@@ -364,7 +370,7 @@ export default function ImagineTab() {
       return;
     }
 
-    haptics.medium();
+    hapticMedium();
     Keyboard.dismiss();
     setIsGenerating(true);
     setGeneratedImage(null);
@@ -421,7 +427,7 @@ export default function ImagineTab() {
       haptics.success();
     } catch (error) {
       console.error('Generation failed:', error);
-      haptics.error();
+      hapticError();
       Alert.alert(
         'Generation Failed',
         error instanceof Error
@@ -435,14 +441,14 @@ export default function ImagineTab() {
   };
 
   const handleQuickPrompt = (quickPrompt: string) => {
-    haptics.button();
+    hapticButton();
     const cleanPrompt = quickPrompt.replace(/^[^\w]+/, '').trim();
     setPrompt(cleanPrompt);
     inputRef.current?.focus();
   };
 
   const handleStyleSelect = (styleId: string) => {
-    haptics.button();
+    hapticButton();
     setSelectedStyle(selectedStyle === styleId ? null : styleId);
   };
 
@@ -480,7 +486,7 @@ export default function ImagineTab() {
   const handleSaveImage = async () => {
     if (!generatedImage?.imageUrl) return;
 
-    haptics.button();
+    hapticButton();
 
     try {
       // Request permission
@@ -531,7 +537,7 @@ export default function ImagineTab() {
       );
     } catch (error) {
       console.error('Failed to save image:', error);
-      haptics.error();
+      hapticError();
       Alert.alert('Save Failed', 'Could not save image. Please try again.');
     }
   };
@@ -540,7 +546,7 @@ export default function ImagineTab() {
   const handleShareImage = async () => {
     if (!generatedImage?.imageUrl) return;
 
-    haptics.button();
+    hapticButton();
 
     try {
       if (Platform.OS === 'ios') {
@@ -559,7 +565,7 @@ export default function ImagineTab() {
     } catch (error) {
       if ((error as any).message !== 'User did not share') {
         console.error('Share failed:', error);
-        haptics.error();
+        hapticError();
         Alert.alert('Share Failed', 'Could not share image. Please try again.');
       }
     }
@@ -598,7 +604,7 @@ export default function ImagineTab() {
       <Pressable
         style={styles.closeButton}
         onPress={() => {
-          haptics.button();
+          hapticButton();
           setGeneratedImage(null);
         }}
       >
@@ -799,7 +805,7 @@ export default function ImagineTab() {
         },
       ]}
       onPress={() => {
-        haptics.button();
+        hapticButton();
         setShowModelPicker(true);
       }}
     >
@@ -850,7 +856,7 @@ export default function ImagineTab() {
           <Pressable
             style={styles.seeAllButton}
             onPress={() => {
-              haptics.button();
+              hapticButton();
               setShowGallery(true);
             }}
           >
@@ -877,7 +883,7 @@ export default function ImagineTab() {
               <Pressable
                 style={styles.photoCard}
                 onPress={() => {
-                  haptics.button();
+                  hapticButton();
                   // Open photo for animation
                 }}
               >
@@ -929,7 +935,7 @@ export default function ImagineTab() {
               <Pressable
                 style={styles.templateCard}
                 onPress={() => {
-                  haptics.button();
+                  hapticButton();
                   setPrompt(template.prompt);
                   inputRef.current?.focus();
                 }}
@@ -977,7 +983,7 @@ export default function ImagineTab() {
                         : styles.featuredCardMedium,
                     ]}
                     onPress={() => {
-                      haptics.button();
+                      hapticButton();
                       setPrompt(item.prompt);
                       inputRef.current?.focus();
                     }}
@@ -1008,7 +1014,7 @@ export default function ImagineTab() {
                         : styles.featuredCardMedium,
                     ]}
                     onPress={() => {
-                      haptics.button();
+                      hapticButton();
                       setPrompt(item.prompt);
                       inputRef.current?.focus();
                     }}
@@ -1028,21 +1034,6 @@ export default function ImagineTab() {
     );
   };
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <View
-        style={[styles.emptyIcon, { backgroundColor: `${colors.primary}20` }]}
-      >
-        <Ionicons name="sparkles" size={48} color={colors.primary} />
-      </View>
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>
-        Bring your ideas to life
-      </Text>
-      <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>
-        Type a description and watch AI create stunning images for you
-      </Text>
-    </View>
-  );
 
   const renderModeSelector = () => (
     <View style={styles.modeSelector}>
@@ -1121,7 +1112,7 @@ export default function ImagineTab() {
               <Pressable
                 style={styles.removeImageButton}
                 onPress={() => {
-                  haptics.button();
+                  hapticButton();
                   setSelectedImages((prev) =>
                     prev.filter((_, i) => i !== index)
                   );
@@ -1176,7 +1167,7 @@ export default function ImagineTab() {
                   ]}
                   onPress={() => {
                     if (tier.id !== 'free') {
-                      haptics.medium();
+                      hapticMedium();
                       // TODO: Implement actual subscription
                       togglePro();
                       setShowPaywall(false);
@@ -1297,7 +1288,7 @@ export default function ImagineTab() {
             <Pressable
               style={styles.notifyButton}
               onPress={() => {
-                haptics.success();
+                hapticSuccess();
                 setShowVideoPreview(false);
                 Alert.alert(
                   "You're on the list!",
@@ -1351,7 +1342,7 @@ export default function ImagineTab() {
               <Pressable
                 style={styles.upgradeButton}
                 onPress={() => {
-                  haptics.button();
+                  hapticButton();
                   setShowPaywall(true);
                 }}
               >
@@ -1369,7 +1360,7 @@ export default function ImagineTab() {
                 { backgroundColor: colors.glassBackground },
               ]}
               onPress={() => {
-                haptics.button();
+                hapticButton();
                 setShowGallery(!showGallery);
               }}
             >
@@ -1511,7 +1502,7 @@ export default function ImagineTab() {
                       ],
                     ]}
                     onPress={() => {
-                      haptics.button();
+                      hapticButton();
                       setAspectRatio(ratio.id);
                     }}
                   >
@@ -1565,7 +1556,7 @@ export default function ImagineTab() {
                       key={img.id}
                       style={styles.galleryThumb}
                       onPress={() => {
-                        haptics.button();
+                        hapticButton();
                         setGeneratedImage(img);
                       }}
                     >

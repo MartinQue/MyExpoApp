@@ -2,11 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { analyzeNote } from '@/lib/think';
-import {
-  db,
-  type Message as DbMessage,
-  type Conversation,
-} from '@/lib/database';
+import { db } from '@/lib/database';
 
 export interface Message {
   id: string;
@@ -252,7 +248,6 @@ export const useChatStore = create<ChatState>()(
       setError: (error) => set({ error }),
 
       clearHistory: () => {
-        const state = get();
         // Clear current session messages
         set((s) => ({
           messages: [],

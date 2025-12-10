@@ -4,16 +4,12 @@ import {
   TextInput,
   StyleSheet,
   Pressable,
-  Text,
   Keyboard,
-  Dimensions,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width } = Dimensions.get('window');
 
 interface ImagineInputBarProps {
   onGenerate: (prompt: string) => void;

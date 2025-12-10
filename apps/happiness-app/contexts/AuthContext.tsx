@@ -2,7 +2,7 @@
  * AuthContext - Manages authentication state and syncs all stores
  */
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/userStore';
 import { useChatStore } from '@/stores/chatStore';
@@ -44,12 +44,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const setImagineUserId = useImagineStore((s) => s.setUserId);
 
   // Sync all stores with user ID
-  const syncStoresWithUser = (userId: string | null) => {
-    setChatUserId(userId);
-    setPlannerUserId(userId);
-    setLibraryUserId(userId);
-    setImagineUserId(userId);
-  };
+  const syncStoresWithUser = useCallback(
+    (userId: string | null) => {
+      setChatUserId(userId);
+      setPlannerUserId(userId);
+      setLibraryUserId(userId);
+      setImagineUserId(userId);
+    },
+    [setChatUserId, setPlannerUserId, setLibraryUserId, setImagineUserId]
+  );
 
   useEffect(() => {
     // Get initial session
@@ -103,7 +106,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [setUserStoreUserId, syncStoresWithUser]);
 
   const value: AuthContextType = {
     user,

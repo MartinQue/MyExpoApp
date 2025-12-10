@@ -17,7 +17,7 @@ export function GlassView({
   children,
   ...props
 }: GlassViewProps) {
-  const { colors, isDark } = useTheme();
+  const { isDark } = useTheme();
   const resolvedTint = tint ?? (isDark ? 'dark' : 'light');
   const resolvedIntensity = intensity ?? (isDark ? 80 : 40);
 

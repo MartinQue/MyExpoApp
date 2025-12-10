@@ -1,11 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { MotiView, AnimatePresence } from 'moti';
 import { BlurView } from 'expo-blur';
 import { Colors, Typography, BorderRadius } from '@/constants/Theme';
 import { useThinking } from '@/lib/ThinkingContext';
-
-const { width } = Dimensions.get('window');
 
 export function ThinkingDock() {
   const { running, currentStep } = useThinking();

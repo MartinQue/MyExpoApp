@@ -6,7 +6,6 @@
  */
 
 import * as Haptics from 'expo-haptics';
-import { Platform } from 'react-native';
 
 // ============================================================
 // Types
@@ -78,7 +77,7 @@ async function notification(
 /**
  * Trigger a selection haptic (lightest)
  */
-async function selection(): Promise<void> {
+async function selectionAsync(): Promise<void> {
   if (!hapticsEnabled) return;
   try {
     await Haptics.selectionAsync();
@@ -115,8 +114,8 @@ export async function heavy(): Promise<void> {
 /**
  * Selection feedback - for selections, toggles
  */
-export async function selectionFeedback(): Promise<void> {
-  await selection();
+export async function selection(): Promise<void> {
+  await selectionAsync();
 }
 
 /**
@@ -316,7 +315,7 @@ export async function trigger(type: HapticType): Promise<void> {
     case 'heavy':
       return heavy();
     case 'selection':
-      return selectionFeedback();
+      return selection();
     case 'success':
       return success();
     case 'warning':
@@ -357,7 +356,7 @@ const haptics = {
   light,
   medium,
   heavy,
-  selection: selectionFeedback,
+  selection,
   success,
   warning,
   error,

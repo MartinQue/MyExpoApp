@@ -88,7 +88,7 @@ class ChatService {
           createdAt: new Date(),
           user: {
             _id: 2,
-            name: 'Alter Ego',
+            name: 'Companion',
           },
           error: true,
           agent: 'alter_ego',
@@ -127,9 +127,17 @@ class ChatService {
       parts.push(`Active goals: ${context.userProfile.goals.join(', ')}`);
     }
 
-    return parts.length > 0
+    const base = parts.length > 0
       ? `Context: ${parts.join('. ')}. Use this context to personalize your response.`
       : '';
+
+    const audiovisualGuidance = `
+Presentation & voice directives:
+- You are rendered as a Grok-style high-fidelity anime companion powered by Project Airi assets (full-body, expressive, idle + speaking/lip-sync states)
+- Assume responses are spoken through IndexTTS by default; ElevenLabs is only a fallback to mention if troubleshooting
+- Keep tone natural, emotionally rich, and aligned with that premium anime companion experience`;
+
+    return base ? `${base}\n${audiovisualGuidance}` : audiovisualGuidance;
   }
 
   /**

@@ -2,7 +2,12 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { FlatList } from 'react-native';
 import { ChatMessage, sendMessageToAI } from '@/components/chat/ChatHelpers';
 import { useVoiceContext } from '@/contexts/VoiceContext';
-import * as haptics from '@/lib/haptics';
+import {
+  send as hapticSend,
+  success as hapticSuccess,
+  error as hapticError,
+  warning as hapticWarning,
+} from '@/lib/haptics';
 
 interface UseChatConversationOptions {
   initialMessages?: ChatMessage[];
@@ -14,7 +19,6 @@ interface UseChatConversationOptions {
 export function useChatConversation(options: UseChatConversationOptions = {}) {
   const {
     initialMessages = [],
-    enableVoice = false,
     onMessageSent,
     onResponseReceived,
   } = options;
@@ -44,7 +48,7 @@ export function useChatConversation(options: UseChatConversationOptions = {}) {
   const handleSend = useCallback(async (text: string) => {
     if (!text.trim()) return;
     
-    haptics.send();
+    hapticSend();
     
     const userMsg: ChatMessage = {
       _id: `user_${Date.now()}`,
@@ -61,7 +65,7 @@ export function useChatConversation(options: UseChatConversationOptions = {}) {
     try {
       const response = await sendMessageToAI(text);
       
-      haptics.success();
+      hapticSuccess();
       setMessages((prev) => [...prev, response]);
       onResponseReceived?.(response);
       scrollToBottom();
@@ -72,16 +76,16 @@ export function useChatConversation(options: UseChatConversationOptions = {}) {
         _id: `error_${Date.now()}`,
         text: "Something went wrong. Let's try that again.",
         createdAt: new Date(),
-        user: { _id: 2, name: 'Alter Ego' },
+        user: { _id: 2, name: 'Companion' },
         error: true,
       };
       
       setMessages((prev) => [...prev, errorMsg]);
-      haptics.error();
+      hapticError();
     } finally {
       setIsThinking(false);
     }
-  }, [enableVoice, onMessageSent, onResponseReceived, scrollToBottom]);
+  }, [onMessageSent, onResponseReceived, scrollToBottom]);
   
   // Voice toggle
   const handleVoiceToggle = useCallback(async (recording: boolean) => {
@@ -92,11 +96,11 @@ export function useChatConversation(options: UseChatConversationOptions = {}) {
           _id: `error_${Date.now()}`,
           text: "Couldn't start recording. Check your microphone permissions.",
           createdAt: new Date(),
-          user: { _id: 2, name: 'Alter Ego' },
+          user: { _id: 2, name: 'Companion' },
           error: true,
         };
         setMessages((prev) => [...prev, errorMsg]);
-        haptics.error();
+        hapticError();
       }
     } else {
       try {
@@ -108,11 +112,11 @@ export function useChatConversation(options: UseChatConversationOptions = {}) {
             _id: `error_${Date.now()}`,
             text: "I didn't catch that. Could you try speaking again?",
             createdAt: new Date(),
-            user: { _id: 2, name: 'Alter Ego' },
+            user: { _id: 2, name: 'Companion' },
             error: true,
           };
           setMessages((prev) => [...prev, errorMsg]);
-          haptics.warning();
+          hapticWarning();
         }
       } catch (error) {
         console.error('Voice error:', error);
@@ -120,11 +124,11 @@ export function useChatConversation(options: UseChatConversationOptions = {}) {
           _id: `error_${Date.now()}`,
           text: "Something went wrong with voice input. Let's try typing instead.",
           createdAt: new Date(),
-          user: { _id: 2, name: 'Alter Ego' },
+          user: { _id: 2, name: 'Companion' },
           error: true,
         };
         setMessages((prev) => [...prev, errorMsg]);
-        haptics.error();
+        hapticError();
       }
     }
   }, [startRecording, stopRecording, handleSend]);
@@ -136,11 +140,11 @@ export function useChatConversation(options: UseChatConversationOptions = {}) {
         _id: `error_${Date.now()}`,
         text: `Voice error: ${voiceError}. Please try again or type your message.`,
         createdAt: new Date(),
-        user: { _id: 2, name: 'Alter Ego' },
+        user: { _id: 2, name: 'Companion' },
         error: true,
       };
       setMessages((prev) => [...prev, errorMsg]);
-      haptics.error();
+      hapticError();
     }
   }, [voiceError]);
   

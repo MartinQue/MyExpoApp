@@ -19,23 +19,26 @@ import { GlassView } from '@/components/Glass/GlassView';
 import { useUserStore } from '@/stores/userStore';
 import { useTheme } from '@/contexts/ThemeContext';
 import { changePassword, sendPasswordReset } from '@/lib/accountService';
-import haptics from '@/lib/haptics';
+import {
+  button as hapticButton,
+  medium as hapticMedium,
+  success as hapticSuccess,
+  error as hapticError,
+} from '@/lib/haptics';
 
 export default function SecuritySettingsScreen() {
   const router = useRouter();
   const { colors, isDark, getGradientArray } = useTheme();
   const { user, isAuthenticated } = useUserStore();
 
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleBack = () => {
-    haptics.button();
+    hapticButton();
     router.back();
   };
 
@@ -92,32 +95,32 @@ export default function SecuritySettingsScreen() {
     }
 
     setIsUpdating(true);
-    haptics.medium();
+    hapticMedium();
 
     try {
       const result = await changePassword(newPassword);
 
       if (result.success) {
-        haptics.success();
+        hapticSuccess();
         Alert.alert('Success', 'Your password has been updated.', [
           {
             text: 'OK',
             onPress: () => {
-              setCurrentPassword('');
               setNewPassword('');
               setConfirmPassword('');
             },
           },
         ]);
       } else {
-        haptics.error();
+        hapticError();
         Alert.alert(
           'Update Failed',
           result.error || 'Failed to change password'
         );
       }
     } catch (error) {
-      haptics.error();
+      console.error('Password update failed:', error);
+      hapticError();
       Alert.alert('Error', 'Failed to update password. Please try again.');
     } finally {
       setIsUpdating(false);
@@ -135,22 +138,22 @@ export default function SecuritySettingsScreen() {
 
     Alert.alert(
       'Reset Password',
-      `We'll send a password reset link to ${user.email}`,
+      `We\u2019ll send a password reset link to ${user.email}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Send',
           onPress: async () => {
-            haptics.medium();
+            hapticMedium();
             const result = await sendPasswordReset(user.email!);
             if (result.success) {
-              haptics.success();
+              hapticSuccess();
               Alert.alert(
                 'Email Sent',
                 'Check your inbox for the password reset link.'
               );
             } else {
-              haptics.error();
+              hapticError();
               Alert.alert(
                 'Failed',
                 result.error || 'Failed to send reset email'
@@ -336,7 +339,7 @@ export default function SecuritySettingsScreen() {
               color={colors.success}
             />
             <ThemedText style={[styles.tipText, { color: colors.textMuted }]}>
-              Use a unique password that you don't use elsewhere
+              Use a unique password that you don&apos;t use elsewhere
             </ThemedText>
           </View>
 

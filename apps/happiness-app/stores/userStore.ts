@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { db, type UserPreferences } from '@/lib/database';
+import { db } from '@/lib/database';
 import { supabase } from '@/lib/supabase';
 
 export interface User {
@@ -31,7 +31,7 @@ interface UserState {
 
   // Avatar customization
   avatarCustomNames: Record<string, string>;
-  selectedAvatarId: string;
+  selectedAvatarId: AvatarId;
 
   // Actions
   setUser: (user: Partial<User>) => void;
@@ -53,9 +53,9 @@ interface UserState {
   isCardBookmarked: (cardId: string) => boolean;
 
   // Avatar actions
-  setAvatarCustomName: (avatarId: string, customName: string) => void;
-  getAvatarCustomName: (avatarId: string) => string | undefined;
-  setSelectedAvatar: (avatarId: string) => void;
+  setAvatarCustomName: (avatarId: AvatarId | string, customName: string) => void;
+  getAvatarCustomName: (avatarId: AvatarId | string) => string | undefined;
+  setSelectedAvatar: (avatarId: AvatarId) => void;
 
   // Auth actions
   login: (
@@ -96,7 +96,7 @@ export const useUserStore = create<UserState>()(
       likedCards: [],
       bookmarkedCards: [],
       avatarCustomNames: {},
-      selectedAvatarId: 'lumen',
+      selectedAvatarId: 'airi',
 
       setUser: (userData) =>
         set((state) => ({
@@ -238,7 +238,7 @@ export const useUserStore = create<UserState>()(
       getAvatarCustomName: (avatarId) => get().avatarCustomNames[avatarId],
 
       setSelectedAvatar: (avatarId) => {
-        set({ selectedAvatarId: avatarId });
+        set({ selectedAvatarId: avatarId as AvatarId });
       },
 
       login: async (email, password) => {

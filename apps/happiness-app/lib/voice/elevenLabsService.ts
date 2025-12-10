@@ -3,20 +3,27 @@
  * Provides seamless, natural voice responses for AI conversations
  */
 
-import { Audio } from 'expo-av';
-import { ELEVENLABS_API_KEY } from '@/constants/Config';
-import * as Haptics from 'expo-haptics';
-import { Logger } from '@/utils/Logger';
-
-// ========================================
-// React Hook for ElevenLabs TTS
-// ========================================
-
 import { useState, useCallback, useEffect } from 'react';
+import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
+import * as Speech from 'expo-speech';
 
-// ========================================
-// Types
-// ========================================
+// Optional ElevenLabs import - only available in development builds
+let ElevenLabs: any = null;
+let ElevenLabsAvailable = false;
+
+try {
+  const elevenLabsModule = require('@elevenlabs/react-native');
+  ElevenLabs = elevenLabsModule.ElevenLabs;
+  ElevenLabsAvailable = true;
+} catch (error) {
+  // Package not available (e.g., in Expo Go)
+  // Will fall back to expo-speech
+}
+
+import { ELEVENLABS_API_KEY } from '@/constants/Config';
+import { Logger } from '@/utils/Logger';
+import { audioSessionManager } from '@/lib/audio/AudioSessionManager';
 
 export interface VoiceSettings {
   stability?: number;
@@ -32,264 +39,225 @@ export interface SpeakOptions {
   onStart?: () => void;
   onComplete?: () => void;
   onError?: (error: Error) => void;
+  onAudioUrlReady?: (audioUrl: string) => void;
 }
 
-// ========================================
-// Default Configuration
-// ========================================
-
-const DEFAULT_VOICE_ID = 'EXAVITQu4vr4xnSDxMaL'; // Sarah - Soft & Natural
-const DEFAULT_MODEL_ID = 'eleven_turbo_v2_5'; // Fastest model
-
+const DEFAULT_VOICE_ID = 'EXAVITQu4vr4xnSDxMaL';
+const DEFAULT_MODEL_ID = 'eleven_multilingual_v2';
 const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
-  stability: 0.5,
-  similarity_boost: 0.75,
-  style: 0.5,
+  stability: 0.65,
+  similarity_boost: 0.8,
+  style: 0.6,
   use_speaker_boost: true,
 };
 
-// ========================================
-// ElevenLabs Service Class
-// ========================================
-
 class ElevenLabsService {
   private sound: Audio.Sound | null = null;
-  private isInitialized: boolean = false;
-  private isSpeaking: boolean = false;
+  private isInitialized = false;
+  private isSpeaking = false;
 
-  /**
-   * Initialize audio session for playback
-   */
   async initialize(): Promise<boolean> {
-    if (this.isInitialized) {
+    if (this.isInitialized) return true;
+
+    // If ElevenLabs package is not available, use expo-speech fallback
+    if (!ElevenLabsAvailable) {
+      Logger.info('📢 ElevenLabs not available, using expo-speech fallback');
+      this.isInitialized = true;
       return true;
     }
 
-    try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
+    if (!ELEVENLABS_API_KEY) {
+      Logger.error('ElevenLabs API key missing; cannot initialize');
+      return false;
+    }
 
+    try {
+      ElevenLabs.configure({ apiKey: ELEVENLABS_API_KEY });
+      // Use AudioSessionManager for consistent audio session handling
+      await audioSessionManager.initialize();
+      await audioSessionManager.setMode('playback');
       this.isInitialized = true;
-      Logger.info('✅ ElevenLabs service initialized');
+      Logger.info('✅ ElevenLabs SDK configured');
       return true;
     } catch (error) {
-      Logger.error('❌ Failed to initialize ElevenLabs service:', error);
+      Logger.error('❌ Failed to initialize ElevenLabs SDK:', error);
       return false;
     }
   }
 
-  /**
-   * Check if API key is configured
-   */
   isConfigured(): boolean {
-    return !!ELEVENLABS_API_KEY;
+    // TTS is always available (expo-speech fallback), but ElevenLabs requires API key
+    return ElevenLabsAvailable ? !!ELEVENLABS_API_KEY : true;
   }
 
-  /**
-   * Convert text to speech and play immediately
-   */
   async speak(text: string, options: SpeakOptions = {}): Promise<boolean> {
-    if (!this.isConfigured()) {
-      const error = new Error('ElevenLabs API key not configured');
-      Logger.error(error.message);
+    if (!text?.trim()) return false;
+
+    await this.stop();
+
+    const ready = await this.initialize();
+    if (!ready) {
+      const error = new Error('Failed to initialize TTS service');
       options.onError?.(error);
       return false;
     }
 
-    // Stop any current playback
-    await this.stop();
+    // Fallback to expo-speech if ElevenLabs is not available
+    if (!ElevenLabsAvailable || !this.isConfigured()) {
+      try {
+        Logger.info('📢 Using expo-speech fallback');
+        this.isSpeaking = true;
+        options.onStart?.();
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+        await Speech.speak(text, {
+          language: 'en',
+          pitch: 1.0,
+          rate: 0.9,
+          onDone: () => {
+            this.isSpeaking = false;
+            options.onComplete?.();
+          },
+          onStopped: () => {
+            this.isSpeaking = false;
+          },
+          onError: (error) => {
+            this.isSpeaking = false;
+            options.onError?.(new Error(String(error)));
+          },
+        });
+
+        return true;
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        Logger.error('❌ expo-speech TTS failed:', err);
+        this.isSpeaking = false;
+        options.onError?.(err);
+        return false;
+      }
+    }
+
+    // Use ElevenLabs if available and configured
     try {
-      // Initialize if needed
-      await this.initialize();
-
       const {
         voiceId = DEFAULT_VOICE_ID,
         modelId = DEFAULT_MODEL_ID,
         voiceSettings = DEFAULT_VOICE_SETTINGS,
         onStart,
         onComplete,
+        onAudioUrlReady,
       } = options;
 
-      Logger.info('🎤 Generating speech for: ' + text.substring(0, 50) + '...');
-      Logger.debug('📍 Voice ID:', voiceId);
-      Logger.debug('🔑 API Key present:', !!ELEVENLABS_API_KEY);
+      const ttsOptions = {
+        text,
+        voiceId,
+        modelId,
+        voiceSettings,
+        optimizeStreamingLatency: 4,
+        outputFormat: 'mp3_44100_128',
+      };
 
-      // Use fetch API to get audio from ElevenLabs
-      const response = await fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-        {
-          method: 'POST',
-          headers: {
-            Accept: 'audio/mpeg',
-            'Content-Type': 'application/json',
-            'xi-api-key': ELEVENLABS_API_KEY || '',
-          },
-          body: JSON.stringify({
-            text,
-            model_id: modelId,
-            voice_settings: voiceSettings,
-          }),
-        }
-      );
+      Logger.info('🎤 Requesting ElevenLabs playback', ttsOptions);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `ElevenLabs API error: ${response.status} - ${errorText}`
-        );
+      const response = await ElevenLabs.textToSpeech(ttsOptions);
+
+      if (!response?.audioUrl) {
+        throw new Error('ElevenLabs returned empty audioUrl');
       }
 
-      // Convert response to blob and create data URI
-      const audioBlob = await response.blob();
-      const reader = new FileReader();
+      // Call onAudioUrlReady callback for VRM lip sync
+      onAudioUrlReady?.(response.audioUrl);
 
-      const audioUri = await new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => {
-          if (typeof reader.result === 'string') {
-            resolve(reader.result);
-          } else {
-            reject(new Error('Failed to read audio data'));
-          }
-        };
-        reader.onerror = () => reject(new Error('FileReader error'));
-        reader.readAsDataURL(audioBlob);
-      });
-
-      Logger.info('🔊 Playing audio...');
-
-      // Play audio immediately
       const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUri },
+        { uri: response.audioUrl },
         { shouldPlay: true },
-        this.onPlaybackStatusUpdate.bind(this, onComplete)
+        async (status) => {
+          if (!status.isLoaded && status.error) {
+            Logger.error('❌ ElevenLabs playback error:', status.error);
+            this.isSpeaking = false;
+            options.onError?.(new Error(String(status.error)));
+          }
+
+          if (status.isLoaded && status.didJustFinish) {
+            Logger.info('✅ ElevenLabs playback completed');
+            this.isSpeaking = false;
+            await this.sound?.unloadAsync();
+            this.sound = null;
+            onComplete?.();
+          }
+        }
       );
 
       this.sound = sound;
       this.isSpeaking = true;
 
-      // Haptic feedback on start
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       onStart?.();
 
-      Logger.info('✅ Speech started successfully');
       return true;
     } catch (error) {
-      Logger.error('❌ Speech generation failed:', error);
       const err = error instanceof Error ? error : new Error(String(error));
-      options.onError?.(err);
+      Logger.error('❌ ElevenLabs TTS failed:', err);
       this.isSpeaking = false;
+      options.onError?.(err);
       return false;
     }
   }
 
-  /**
-   * Playback status update handler
-   */
-  private onPlaybackStatusUpdate(
-    onComplete: (() => void) | undefined,
-    status: any
-  ): void {
-    if (status.isLoaded && status.didJustFinish) {
-      Logger.info('✅ Speech completed');
-      this.isSpeaking = false;
-      this.sound?.unloadAsync();
-      this.sound = null;
-      onComplete?.();
-    }
-
-    if (status.error) {
-      Logger.error('❌ Playback error:', status.error);
-      this.isSpeaking = false;
-    }
-  }
-
-  /**
-   * Stop current speech playback
-   */
   async stop(): Promise<void> {
-    if (this.sound) {
-      try {
-        await this.sound.stopAsync();
-        await this.sound.unloadAsync();
-        this.sound = null;
-        this.isSpeaking = false;
-        Logger.info('⏹️ Speech stopped');
-      } catch (error) {
-        Logger.error('Failed to stop speech:', error);
-      }
+    // Stop expo-speech if using fallback
+    if (!ElevenLabsAvailable || !this.sound) {
+      Speech.stop();
+      this.isSpeaking = false;
+      await audioSessionManager.setMode('idle');
+      return;
+    }
+
+    // Stop ElevenLabs audio
+    if (!this.sound) return;
+
+    try {
+      await this.sound.stopAsync();
+      await this.sound.unloadAsync();
+      this.sound = null;
+      this.isSpeaking = false;
+      await audioSessionManager.setMode('idle');
+      Logger.info('⏹️ ElevenLabs playback stopped');
+    } catch (error) {
+      Logger.error('Failed to stop ElevenLabs playback:', error);
+      await audioSessionManager.setMode('idle');
     }
   }
 
-  /**
-   * Check if currently speaking
-   */
-  isSpeakingNow(): boolean {
-    return this.isSpeaking;
-  }
-
-  /**
-   * Pause current playback
-   */
   async pause(): Promise<void> {
-    if (this.sound && this.isSpeaking) {
-      try {
-        await this.sound.pauseAsync();
-        Logger.info('⏸️ Speech paused');
-      } catch (error) {
-        Logger.error('Failed to pause speech:', error);
-      }
+    if (!this.sound || !this.isSpeaking) return;
+    try {
+      await this.sound.pauseAsync();
+      Logger.info('⏸️ ElevenLabs playback paused');
+    } catch (error) {
+      Logger.error('Failed to pause ElevenLabs playback:', error);
     }
   }
 
-  /**
-   * Resume paused playback
-   */
   async resume(): Promise<void> {
-    if (this.sound) {
-      try {
-        await this.sound.playAsync();
-        Logger.info('▶️ Speech resumed');
-      } catch (error) {
-        Logger.error('Failed to resume speech:', error);
-      }
+    if (!this.sound) return;
+    try {
+      await this.sound.playAsync();
+      Logger.info('▶️ ElevenLabs playback resumed');
+    } catch (error) {
+      Logger.error('Failed to resume ElevenLabs playback:', error);
     }
   }
 
-  /**
-   * Get playback position in milliseconds
-   */
-  async getPosition(): Promise<number> {
-    if (this.sound) {
-      try {
-        const status = await this.sound.getStatusAsync();
-        if (status.isLoaded) {
-          return status.positionMillis;
-        }
-      } catch (error) {
-        Logger.error('Failed to get playback position:', error);
-      }
-    }
-    return 0;
-  }
-
-  /**
-   * Clean up resources
-   */
   async cleanup(): Promise<void> {
     await this.stop();
     this.isInitialized = false;
   }
-}
 
-// ========================================
-// Singleton Instance
-// ========================================
+  isSpeakingNow(): boolean {
+    return this.isSpeaking;
+  }
+}
 
 export const elevenLabsService = new ElevenLabsService();
 

@@ -1130,7 +1130,7 @@ export function generateInstantFeed(params: {
   userName: string;
   plans: Plan[];
 }): FeedCard[] {
-  const { userName, plans } = params;
+  const { plans } = params;
   const { timeOfDay } = getTimeContext();
   const feed: FeedCard[] = [];
 

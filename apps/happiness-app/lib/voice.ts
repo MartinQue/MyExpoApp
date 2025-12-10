@@ -12,6 +12,8 @@ import {
   initializeTranscriptionProvider,
   getTranscriptionProvider,
 } from './voice/transcriptionProvider';
+import { audioSessionManager } from './audio/AudioSessionManager';
+import { Logger } from '@/utils/Logger';
 
 // ========================================
 // React Hook for Voice
@@ -100,24 +102,10 @@ class VoiceService {
    */
   async initialize(): Promise<boolean> {
     try {
-      const { status } = await Audio.requestPermissionsAsync();
-
-      if (status !== 'granted') {
-        console.error('Audio permission not granted');
-        return false;
-      }
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
-
+      await audioSessionManager.initialize();
       return true;
     } catch (error) {
-      console.error('Failed to initialize audio:', error);
+      Logger.error('Failed to initialize audio:', error);
       return false;
     }
   }
@@ -134,38 +122,44 @@ class VoiceService {
    */
   async startRecording(): Promise<boolean> {
     try {
-      // Stop any existing recording first
+      // CRITICAL: Stop and cleanup any existing recording first
+      // This prevents "Only one Recording object can be prepared" error
       if (this.recording) {
-        await this.stopRecording();
+        try {
+          await this.recording.stopAndUnloadAsync();
+        } catch (stopError) {
+          Logger.warn('Error stopping existing recording:', stopError);
+        }
+        this.recording = null;
       }
+
+      // Clear any existing duration interval
+      if (this.durationInterval) {
+        clearInterval(this.durationInterval);
+        this.durationInterval = null;
+      }
+
+      // Initialize audio session manager
+      await audioSessionManager.initialize();
 
       // Request permissions
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
         const error = new Error('Microphone permission not granted');
-        console.error(error.message);
+        Logger.error(error.message);
         this.callbacks.onError?.(error);
         return false;
       }
 
-      // CRITICAL: Set audio mode IMMEDIATELY before creating recording
-      // This is the fix for "Recording not allowed on iOS"
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
-
-      // Small delay to ensure audio mode is set (iOS quirk)
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // CRITICAL: Set audio mode for recording using AudioSessionManager
+      // This prevents conflicts with LiveKit, ElevenLabs, etc.
+      await audioSessionManager.setMode('recording');
 
       // Haptic feedback
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
       // Create new recording with explicit options
-      console.log('Creating recording with options:', RECORDING_OPTIONS);
+      Logger.info('Creating recording with options:', RECORDING_OPTIONS);
       const { recording } = await Audio.Recording.createAsync(
         RECORDING_OPTIONS as Audio.RecordingOptions,
         (status) => {
@@ -173,7 +167,7 @@ class VoiceService {
           if (status.isRecording) {
             const duration = Math.floor((status.durationMillis || 0) / 1000);
             this.callbacks.onDurationUpdate?.(duration);
-            
+
             if (typeof status.metering === 'number') {
               this.callbacks.onMeteringUpdate?.(status.metering);
             }
@@ -194,20 +188,17 @@ class VoiceService {
       }, 100);
 
       this.callbacks.onRecordingStart?.();
-      console.log('✅ Recording started successfully');
+      Logger.info('✅ Recording started successfully');
 
       return true;
     } catch (error) {
-      console.error('❌ Failed to start recording:', error);
+      Logger.error('❌ Failed to start recording:', error);
 
-      // Try to reset audio mode on error
+      // Reset audio mode on error
       try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-        });
+        await audioSessionManager.reset();
       } catch (resetError) {
-        console.error('Failed to reset audio mode:', resetError);
+        Logger.error('Failed to reset audio mode:', resetError);
       }
 
       this.callbacks.onError?.(error as Error);
@@ -239,20 +230,26 @@ class VoiceService {
       const uri = this.recording.getURI();
       this.recording = null;
 
-      // Reset audio mode
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-      });
+      // Reset audio mode using AudioSessionManager
+      await audioSessionManager.setMode('idle');
 
       if (uri) {
         this.callbacks.onRecordingStop?.(uri);
-        console.log('Recording stopped, saved to:', uri);
+        Logger.info('Recording stopped, saved to:', uri);
       }
 
       return uri;
     } catch (error) {
-      console.error('Failed to stop recording:', error);
+      Logger.error('Failed to stop recording:', error);
+      // Ensure audio mode is reset even on error
+      try {
+        await audioSessionManager.setMode('idle');
+      } catch (resetError) {
+        Logger.error(
+          'Failed to reset audio mode after stop error:',
+          resetError
+        );
+      }
       this.callbacks.onError?.(error as Error);
       return null;
     }
@@ -269,17 +266,28 @@ class VoiceService {
       }
 
       if (this.recording) {
-        await this.recording.stopAndUnloadAsync();
+        try {
+          await this.recording.stopAndUnloadAsync();
+        } catch (stopError) {
+          Logger.warn('Error stopping recording during cancel:', stopError);
+        }
         this.recording = null;
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-      });
+      await audioSessionManager.setMode('idle');
 
-      console.log('Recording cancelled');
+      Logger.info('Recording cancelled');
     } catch (error) {
-      console.error('Failed to cancel recording:', error);
+      Logger.error('Failed to cancel recording:', error);
+      // Ensure audio mode is reset even on error
+      try {
+        await audioSessionManager.setMode('idle');
+      } catch (resetError) {
+        Logger.error(
+          'Failed to reset audio mode after cancel error:',
+          resetError
+        );
+      }
     }
   }
 
@@ -309,7 +317,7 @@ class VoiceService {
           return result;
         }
       } catch (error) {
-        console.warn(
+        Logger.warn(
           'Transcription provider failed, falling back to OpenAI Whisper:',
           error
         );
@@ -327,14 +335,14 @@ class VoiceService {
     uri: string
   ): Promise<TranscriptionResult | null> {
     if (!OPENAI_API_KEY) {
-      console.error('OpenAI API key not configured');
+      Logger.error('OpenAI API key not configured');
       this.callbacks.onError?.(new Error('OpenAI API key not configured'));
       return null;
     }
 
     try {
       this.callbacks.onTranscriptionStart?.();
-      console.log('🎯 Starting transcription with OpenAI Whisper for:', uri);
+      Logger.info('🎯 Starting transcription with OpenAI Whisper for:', uri);
 
       // Read the file info
       const fileInfo = await FileSystem.getInfoAsync(uri);
@@ -342,7 +350,7 @@ class VoiceService {
         throw new Error('Audio file not found');
       }
 
-      console.log('📁 File info:', JSON.stringify(fileInfo, null, 2));
+      Logger.debug('📁 File info:', JSON.stringify(fileInfo, null, 2));
 
       // Determine file extension from URI
       const extension = uri.split('.').pop()?.toLowerCase() || 'm4a';
@@ -355,7 +363,7 @@ class VoiceService {
           ? 'audio/webm'
           : 'audio/m4a';
 
-      console.log('🎵 File extension:', extension, 'MIME type:', mimeType);
+      Logger.debug('🎵 File extension:', extension, 'MIME type:', mimeType);
 
       // Create form data for the API request
       const formData = new FormData();
@@ -374,7 +382,7 @@ class VoiceService {
       // Don't specify language to allow auto-detection
       // formData.append('language', 'en');
 
-      console.log('📤 Sending to Whisper API...');
+      Logger.info('📤 Sending to Whisper API...');
 
       // Send to OpenAI Whisper API
       const transcriptionResponse = await fetch(
@@ -390,7 +398,7 @@ class VoiceService {
 
       if (!transcriptionResponse.ok) {
         const errorText = await transcriptionResponse.text();
-        console.error('❌ Whisper API error response:', errorText);
+        Logger.error('❌ Whisper API error response:', errorText);
         let errorMessage = 'Transcription failed';
         try {
           const errorJson = JSON.parse(errorText);
@@ -402,7 +410,7 @@ class VoiceService {
       }
 
       const data = await transcriptionResponse.json();
-      console.log('✅ Whisper API response:', JSON.stringify(data, null, 2));
+      Logger.debug('✅ Whisper API response:', JSON.stringify(data, null, 2));
 
       const result: TranscriptionResult = {
         text: data.text || '',
@@ -411,7 +419,7 @@ class VoiceService {
       };
 
       this.callbacks.onTranscriptionComplete?.(result);
-      console.log('✅ Transcription complete:', result.text.slice(0, 100));
+      Logger.info('✅ Transcription complete:', result.text.slice(0, 100));
 
       // Haptic success feedback
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -420,20 +428,13 @@ class VoiceService {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error('❌ Transcription failed:', error);
+      Logger.error('❌ Transcription failed:', error);
 
       // Log transcription failures for debugging
-      try {
-        // Dynamic import for Logger (avoids circular dependencies)
-        const LoggerModule = await import('../utils/Logger');
-        LoggerModule.Logger.error('Voice transcription failed', {
-          error: errorMessage,
-          uri: uri.substring(0, 50) + '...',
-        });
-      } catch {
-        // Logger not available, continue
-        console.error('Voice transcription failed:', errorMessage);
-      }
+      Logger.error('Voice transcription failed', {
+        error: errorMessage,
+        uri: uri.substring(0, 50) + '...',
+      });
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       this.callbacks.onError?.(error as Error);
@@ -478,7 +479,7 @@ class VoiceService {
         }
       });
     } catch (error) {
-      console.error('Failed to play audio:', error);
+      Logger.error('Failed to play audio:', error);
       this.callbacks.onError?.(error as Error);
     }
   }
@@ -494,7 +495,7 @@ class VoiceService {
         this.sound = null;
       }
     } catch (error) {
-      console.error('Failed to stop playback:', error);
+      Logger.error('Failed to stop playback:', error);
     }
   }
 

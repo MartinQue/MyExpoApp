@@ -8,7 +8,7 @@ import { Pressable, StyleSheet, Text, ViewStyle, TextStyle } from 'react-native'
 import { GlassView } from './GlassView';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
-import haptics from '@/lib/haptics';
+import { button as hapticButton } from '@/lib/haptics';
 
 interface GlassButtonProps {
   label: string;
@@ -33,7 +33,7 @@ export function GlassButton({
   disabled = false,
   intensity,
 }: GlassButtonProps) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   const sizeStyles = {
     small: { height: 36, paddingHorizontal: 16, fontSize: 14 },
@@ -58,7 +58,7 @@ export function GlassButton({
 
   const handlePress = () => {
     if (disabled) return;
-    haptics.button();
+    hapticButton();
     onPress();
   };
 

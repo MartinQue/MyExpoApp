@@ -21,7 +21,12 @@ import { GlassView } from '@/components/Glass/GlassView';
 import { useUserStore } from '@/stores/userStore';
 import { useTheme } from '@/contexts/ThemeContext';
 import { updateProfile } from '@/lib/accountService';
-import haptics from '@/lib/haptics';
+import {
+  selection as hapticSelection,
+  success as hapticSuccess,
+  medium as hapticMedium,
+  error as hapticError,
+} from '@/lib/haptics';
 
 export default function ProfileSettingsScreen() {
   const router = useRouter();
@@ -63,7 +68,7 @@ export default function ProfileSettingsScreen() {
   };
 
   const handlePickAvatar = async () => {
-    haptics.selection();
+    hapticSelection();
 
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -83,7 +88,7 @@ export default function ProfileSettingsScreen() {
 
     if (!result.canceled && result.assets[0]) {
       setAvatarUri(result.assets[0].uri);
-      haptics.success();
+      hapticSuccess();
     }
   };
 
@@ -99,7 +104,7 @@ export default function ProfileSettingsScreen() {
     }
 
     setIsSaving(true);
-    haptics.medium();
+    hapticMedium();
 
     try {
       const result = await updateProfile(user.id, {
@@ -116,16 +121,17 @@ export default function ProfileSettingsScreen() {
           avatar: avatarUri,
         });
 
-        haptics.success();
+        hapticSuccess();
         Alert.alert('Success', 'Your profile has been updated.', [
           { text: 'OK', onPress: () => router.back() },
         ]);
       } else {
-        haptics.error();
+        hapticError();
         Alert.alert('Update Failed', result.error || 'Something went wrong');
       }
     } catch (error) {
-      haptics.error();
+      console.error('Profile update failed:', error);
+      hapticError();
       Alert.alert('Error', 'Failed to update profile. Please try again.');
     } finally {
       setIsSaving(false);

@@ -30,7 +30,14 @@ import {
   deleteAccount,
   LEGAL_URLS,
 } from '@/lib/accountService';
-import haptics from '@/lib/haptics';
+import {
+  button as hapticButton,
+  selection as hapticSelection,
+  medium as hapticMedium,
+  success as hapticSuccess,
+  error as hapticError,
+  warning as hapticWarning,
+} from '@/lib/haptics';
 
 const APP_VERSION = Application.nativeApplicationVersion || '1.0.0';
 const BUILD_NUMBER = Application.nativeBuildVersion || '1';
@@ -220,24 +227,24 @@ export default function SettingsScreen() {
   const setHapticEnabled = useUserStore((s) => s.setHapticEnabled);
 
   const handleBack = () => {
-    haptics.button();
+    hapticButton();
     router.back();
   };
 
   const handleNavigate = (route: string) => {
-    haptics.selection();
+    hapticSelection();
     router.push(route as any);
   };
 
   const handleOpenUrl = (url: string) => {
-    haptics.selection();
+    hapticSelection();
     Linking.openURL(url).catch(() => {
       Alert.alert('Error', 'Could not open link');
     });
   };
 
   const handleToggle = (key: string, value: boolean) => {
-    haptics.selection();
+    hapticSelection();
     if (key === 'darkMode') {
       toggleTheme();
     } else if (key === 'notificationsEnabled') {
@@ -262,15 +269,15 @@ export default function SettingsScreen() {
           text: 'Export',
           onPress: async () => {
             setIsExporting(true);
-            haptics.medium();
+            hapticMedium();
 
             const result = await exportUserData(user.id!);
 
             setIsExporting(false);
             if (result.success) {
-              haptics.success();
+              hapticSuccess();
             } else {
-              haptics.error();
+              hapticError();
               Alert.alert(
                 'Export Failed',
                 result.error || 'Could not export data'
@@ -289,7 +296,7 @@ export default function SettingsScreen() {
     }
 
     Alert.alert(
-      '⚠️ Delete Account',
+      'Delete Account',
       'This will permanently delete your account and all your data. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -307,17 +314,17 @@ export default function SettingsScreen() {
                   style: 'destructive',
                   onPress: async () => {
                     setIsDeleting(true);
-                    haptics.warning();
+                    hapticWarning();
 
                     const result = await deleteAccount(user.id!);
 
                     setIsDeleting(false);
                     if (result.success) {
-                      haptics.success();
+                      hapticSuccess();
                       logout();
                       router.replace('/');
                     } else {
-                      haptics.error();
+                      hapticError();
                       Alert.alert(
                         'Deletion Failed',
                         result.error || 'Could not delete account'
@@ -334,12 +341,12 @@ export default function SettingsScreen() {
   };
 
   const handleSendFeedback = () => {
-    haptics.selection();
+    hapticSelection();
     Linking.openURL('mailto:support@alterego-ai.com?subject=App Feedback');
   };
 
   const handleRateApp = async () => {
-    haptics.selection();
+    hapticSelection();
     if (await StoreReview.hasAction()) {
       await StoreReview.requestReview();
     } else {
@@ -352,13 +359,13 @@ export default function SettingsScreen() {
   };
 
   const handleShareApp = async () => {
-    haptics.selection();
+    hapticSelection();
     try {
       await Share.share({
         message: Platform.select({
-          ios: 'Check out Alter Ego - Your AI companion for personal growth! https://apps.apple.com/app/id123456789',
-          android: 'Check out Alter Ego - Your AI companion for personal growth! https://play.google.com/store/apps/details?id=com.alterego.app',
-          default: 'Check out Alter Ego - Your AI companion for personal growth!',
+          ios: 'Check out Companions - Your AI companion for personal growth! https://apps.apple.com/app/id123456789',
+          android: 'Check out Companions - Your AI companion for personal growth! https://play.google.com/store/apps/details?id=com.alterego.app',
+          default: 'Check out Companions - Your AI companion for personal growth!',
         }),
       });
     } catch (error) {
@@ -375,17 +382,18 @@ export default function SettingsScreen() {
         {
           text: 'Clear',
           onPress: async () => {
-            haptics.medium();
+            hapticMedium();
             try {
               await AsyncStorage.multiRemove([
                 'cache_messages',
                 'cache_images',
                 'cache_audio',
               ]);
-              haptics.success();
+              hapticSuccess();
               Alert.alert('Success', 'Cache cleared successfully');
             } catch (error) {
-              haptics.error();
+              console.error('Clear cache failed:', error);
+              hapticError();
               Alert.alert('Error', 'Failed to clear cache');
             }
           },
@@ -401,7 +409,7 @@ export default function SettingsScreen() {
         text: 'Sign Out',
         style: 'destructive',
         onPress: () => {
-          haptics.medium();
+          hapticMedium();
           logout();
           router.replace('/');
         },
@@ -576,7 +584,7 @@ export default function SettingsScreen() {
                 { backgroundColor: colors.primary },
               ]}
               onPress={() => {
-                haptics.selection();
+                hapticSelection();
                 Alert.alert('Upgrade to Pro', 'Coming soon!');
               }}
             >

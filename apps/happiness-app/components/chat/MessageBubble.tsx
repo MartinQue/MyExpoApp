@@ -6,7 +6,7 @@ import { colors as GrokColors } from '../../constants/GrokColors';
 import { GrokLayout } from '../../constants/GrokLayout';
 import { GrokTypography } from '../../constants/GrokTypography';
 import { useTheme } from '@/contexts/ThemeContext';
-import haptics from '@/lib/haptics';
+import { selection as hapticSelection } from '@/lib/haptics';
 
 interface MessageBubbleProps {
   role: 'user' | 'assistant';
@@ -58,7 +58,7 @@ export function MessageBubble({ role, content }: MessageBubbleProps) {
             <Pressable
               key={label}
               style={styles.actionButton}
-              onPress={() => haptics.selection()}
+              onPress={() => hapticSelection()}
             >
               <Ionicons name={icon as any} size={17} color={GrokColors.muted} />
             </Pressable>

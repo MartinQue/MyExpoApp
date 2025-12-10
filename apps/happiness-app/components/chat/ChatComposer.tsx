@@ -14,7 +14,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { MotiView } from 'moti';
 import { Colors } from '../../constants/Theme';
-import haptics from '@/lib/haptics';
+import {
+  send as hapticSend,
+  medium as hapticMedium,
+  selection as hapticSelection,
+} from '@/lib/haptics';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -22,7 +26,7 @@ interface ChatInputProps {
   onToggleVoiceMode: () => void;
 }
 
-export default function ChatInput({
+export function ChatComposer({
   onSend,
   voiceMode,
   onToggleVoiceMode,
@@ -32,18 +36,18 @@ export default function ChatInput({
 
   const handleSend = () => {
     if (!text.trim()) return;
-    haptics.send();
+    hapticSend();
     onSend(text);
     setText('');
   };
 
   const handleToggleVoice = () => {
-    haptics.medium();
+    hapticMedium();
     onToggleVoiceMode();
   };
 
   const toggleAttachments = () => {
-    haptics.selection();
+    hapticSelection();
     Keyboard.dismiss();
     setShowAttachments(!showAttachments);
   };
@@ -126,7 +130,7 @@ export default function ChatInput({
                         key={opt.label}
                         style={styles.attachmentOption}
                         onPress={() => {
-                          haptics.selection();
+                          hapticSelection();
                           setShowAttachments(false);
                         }}
                       >
@@ -150,6 +154,8 @@ export default function ChatInput({
     </>
   );
 }
+
+export default ChatComposer;
 
 const styles = StyleSheet.create({
   container: {

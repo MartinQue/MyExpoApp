@@ -2,35 +2,43 @@
  * useHaptics hook for consistent haptic feedback
  */
 
-import haptics from '@/lib/haptics';
+import {
+  light as hapticLight,
+  medium as hapticMedium,
+  heavy as hapticHeavy,
+  success as hapticSuccess,
+  warning as hapticWarning,
+  error as hapticError,
+  selection as hapticSelection,
+} from '@/lib/haptics';
 
 export function useHaptics() {
   const light = () => {
-    haptics.light();
+    hapticLight();
   };
 
   const medium = () => {
-    haptics.medium();
+    hapticMedium();
   };
 
   const heavy = () => {
-    haptics.heavy();
+    hapticHeavy();
   };
 
   const success = () => {
-    haptics.success();
+    hapticSuccess();
   };
 
   const warning = () => {
-    haptics.warning();
+    hapticWarning();
   };
 
   const error = () => {
-    haptics.error();
+    hapticError();
   };
 
   const selection = () => {
-    haptics.selection();
+    hapticSelection();
   };
 
   return {

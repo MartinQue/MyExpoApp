@@ -18,6 +18,7 @@
 import { analyzeNote } from '@/lib/think';
 import { AgentType, detectAgentIntent } from '@/lib/langsmith';
 import { voiceService } from '@/lib/voice';
+import { Logger } from '@/utils/Logger';
 
 // ============================================================
 // TYPES
@@ -61,7 +62,7 @@ let recordingStartTime: Date | null = null;
  */
 // Agent display names for UI
 const AGENT_NAMES: Record<AgentType, string> = {
-  alter_ego: 'Alter Ego',
+  alter_ego: 'Companion',
   financial: 'Finance Guide',
   wellness: 'Wellness Coach',
   planner: 'Life Planner',
@@ -122,7 +123,7 @@ export const sendMessageToAI = async (
       createdAt: new Date(),
       user: {
         _id: 2,
-        name: 'Alter Ego',
+        name: 'Companion',
       },
       error: true,
       agent: 'alter_ego',
@@ -134,7 +135,7 @@ export const sendMessageToAI = async (
  * Get the display name for an agent
  */
 export const getAgentDisplayName = (agent: AgentType): string => {
-  return AGENT_NAMES[agent] || 'Alter Ego';
+  return AGENT_NAMES[agent] || 'Companion';
 };
 
 /**
@@ -178,10 +179,10 @@ export const setVoiceCallbacks = (callbacks: typeof voiceCallbacks): void => {
     onRecordingStart: () => {
       isRecording = true;
       recordingStartTime = new Date();
-      console.log('🎤 Voice recording started');
+      Logger.info('🎤 Voice recording started');
     },
     onRecordingStop: () => {
-      console.log('🎤 Voice recording stopped');
+      Logger.info('🎤 Voice recording stopped');
     },
     onDurationUpdate: (duration) => {
       voiceCallbacks.onDurationUpdate?.(duration);
@@ -196,7 +197,7 @@ export const setVoiceCallbacks = (callbacks: typeof voiceCallbacks): void => {
       voiceCallbacks.onTranscriptionComplete?.(result.text);
     },
     onError: (error) => {
-      console.error('🎤 Voice error:', error.message);
+      Logger.error('🎤 Voice error:', error.message);
       voiceCallbacks.onError?.(error);
     },
   });
@@ -206,21 +207,21 @@ export const setVoiceCallbacks = (callbacks: typeof voiceCallbacks): void => {
  * Start voice recording using the real voice service
  */
 export const startVoiceInput = async (): Promise<boolean> => {
-  console.log('🎤 Starting voice input (real implementation)...');
+  Logger.info('🎤 Starting voice input (real implementation)...');
 
   try {
     const started = await voiceService.startRecording();
     if (started) {
       isRecording = true;
       recordingStartTime = new Date();
-      console.log('✅ Voice recording started successfully');
+      Logger.info('✅ Voice recording started successfully');
     } else {
-      console.error('❌ Failed to start voice recording');
+      Logger.error('❌ Failed to start voice recording');
       voiceCallbacks.onError?.(new Error('Failed to start recording'));
     }
     return started;
   } catch (error) {
-    console.error('❌ Error starting voice input:', error);
+    Logger.error('❌ Error starting voice input:', error);
     voiceCallbacks.onError?.(error as Error);
     return false;
   }
@@ -241,7 +242,7 @@ export const stopVoiceInput = async (): Promise<string> => {
 
   // Check if recording is too short
   if (duration < 0.5) {
-    console.log('⚠️ Recording too short, ignoring');
+    console.warn('Recording too short, ignoring');
     await voiceService.stopRecording(); // Still stop recording
     return '';
   }
@@ -258,7 +259,7 @@ export const stopVoiceInput = async (): Promise<string> => {
       voiceCallbacks.onTranscriptionComplete?.(result.text);
       return result.text;
     } else {
-      console.log('⚠️ No transcription result');
+      console.warn('No transcription result');
       return '';
     }
   } catch (error) {

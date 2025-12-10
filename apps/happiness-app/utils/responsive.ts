@@ -70,8 +70,8 @@ export function scaleSize(points: number): number {
     const result = Math.round(points * scale);
     // Ensure we never return 0 or negative for positive inputs
     return result > 0 ? result : points;
-  } catch (error) {
-    console.warn('scaleSize error, returning original value', error);
+  } catch (err) {
+    console.warn('scaleSize error, returning original value', err);
     return points;
   }
 }
@@ -85,7 +85,8 @@ export function scaleWidth(points: number): string {
   try {
     const percentage = (points / FIGMA_BASE_WIDTH) * 100;
     return `${percentage}%`;
-  } catch (error) {
+  } catch (err) {
+    console.warn('scaleWidth error, returning fallback', err);
     return '100%';
   }
 }
@@ -99,7 +100,8 @@ export function scaleHeight(points: number): string {
   try {
     const percentage = (points / FIGMA_BASE_HEIGHT) * 100;
     return `${percentage}%`;
-  } catch (error) {
+  } catch (err) {
+    console.warn('scaleHeight error, returning fallback', err);
     return '100%';
   }
 }
@@ -115,8 +117,8 @@ export function scaleFont(points: number): number {
     const scale = width / FIGMA_BASE_WIDTH;
     const result = Math.round(points * scale);
     return result > 0 ? result : points;
-  } catch (error) {
-    console.warn('scaleFont error, returning original value', error);
+  } catch (err) {
+    console.warn('scaleFont error, returning original value', err);
     return points;
   }
 }
